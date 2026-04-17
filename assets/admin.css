@@ -425,6 +425,19 @@
 .fbpro-status--ok  { color: #059669; }
 .fbpro-status--err { color: #dc2626; }
 
+/* ── Icon wrap (preview en card y modal) ────────────────────── */
+.fbpro-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.fbpro-icon-wrap svg {
+  width: 100%;
+  height: 100%;
+}
+
 /* ── SVG grid (selector de iconos) ──────────────────────────── */
 .fbpro-svg-grid {
   display: grid;

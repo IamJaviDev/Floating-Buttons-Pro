@@ -14,6 +14,7 @@ define( 'FBPRO_VERSION', '2.0.0' );
 define( 'FBPRO_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'FBPRO_URL',     plugin_dir_url( __FILE__ ) );
 
+require_once FBPRO_DIR . 'includes/icons.php';
 require_once FBPRO_DIR . 'includes/helpers.php';
 require_once FBPRO_DIR . 'includes/frontend.php';
 require_once FBPRO_DIR . 'includes/admin.php';

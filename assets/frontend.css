@@ -31,10 +31,15 @@
   will-change: transform;
 }
 
-/* SVG: tamaño y color vienen del CSS dinámico inline por data-btn-id */
-.fbpro-btn svg {
+/* SVG e imagen: tamaño y color vienen del CSS dinámico por data-btn-id */
+.fbpro-btn svg,
+.fbpro-btn .fbpro-btn__img {
   flex-shrink: 0;
   pointer-events: none;
+}
+.fbpro-btn .fbpro-btn__img {
+  object-fit: contain;
+  display: block;
 }
 
 /* ── Tooltip ─────────────────────────────────────────────────── */

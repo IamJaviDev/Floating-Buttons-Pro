@@ -48,7 +48,7 @@ function fbpro_admin_assets( $hook ) {
         'nonce'        => wp_create_nonce( 'fbpro_admin' ),
         'buttons'      => $buttons,
         'global'       => fbpro_get_global(),
-        'svgLibrary'   => fbpro_svg_library(),
+        'svgLibrary'   => fbpro_icon_admin_data(),
         'defaults'     => fbpro_button_defaults(),
         'setupPending' => (bool) get_option( 'fbpro_setup_pending' ),
     ] );
@@ -237,7 +237,7 @@ function fbpro_verify_nonce() {
 }
 
 function fbpro_sanitize_button( $raw ) {
-    $svgs    = array_keys( fbpro_svg_library() );
+    $svgs    = array_keys( fbpro_icon_library() );
     $corners = [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ];
 
     return [

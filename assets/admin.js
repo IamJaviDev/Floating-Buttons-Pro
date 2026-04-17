@@ -99,12 +99,14 @@
     svgPreviewHtml: function (btn, color, size) {
       size = size || '55%';
       if (btn.icon_type === 'image' && btn.icon_image_url) {
-        return '<img src="' + this.escAttr(btn.icon_image_url) + '" style="width:' + size + ';height:' + size + ';object-fit:contain;" alt="">';
+        return '<img src="' + this.escAttr(btn.icon_image_url) + '" style="width:' + size + ';height:' + size + ';object-fit:contain;pointer-events:none;flex-shrink:0;" alt="">';
       }
       var lib  = (window.fbproData && fbproData.svgLibrary) ? fbproData.svgLibrary : {};
       var slug = btn.icon_svg || 'phone';
-      var svg  = lib[slug] || lib['phone'] || {path: '', viewBox: '0 0 24 24'};
-      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + svg.viewBox + '" fill="' + color + '" style="width:' + size + ';height:' + size + ';pointer-events:none;" aria-hidden="true"><path d="' + svg.path + '"/></svg>';
+      var item = lib[slug] || lib['phone'] || {};
+      var svgHtml = item.svg || '';
+      // SVGs usan fill="currentColor" — el color se hereda via la propiedad CSS color
+      return '<span class="fbpro-icon-wrap" style="color:' + this.escAttr(color) + ';width:' + size + ';height:' + size + ';" aria-hidden="true">' + svgHtml + '</span>';
     },
 
     /* ── Sortable ──────────────────────────────────────────── */
@@ -216,7 +218,7 @@
         var sel  = slug === (btn.icon_svg || 'phone');
         svgGrid += '<label class="fbpro-svg-item' + (sel ? ' is-selected' : '') + '" title="' + self.escAttr(item.label) + '">' +
           '<input type="radio" name="fbpro_icon_svg" value="' + slug + '"' + (sel ? ' checked' : '') + ' style="display:none">' +
-          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + item.viewBox + '" fill="currentColor"><path d="' + item.path + '"/></svg>' +
+          item.svg +
           '<span>' + self.escHtml(item.label) + '</span>' +
         '</label>';
       });

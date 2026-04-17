@@ -71,7 +71,7 @@ function fbpro_render_button( $btn ) {
         $extra  = ltrim( $target );
     }
 
-    $icon_html = fbpro_render_icon_html( $btn );
+    $icon_html = fbpro_render_icon( $btn );
 
     echo '<a class="fbpro-btn" data-btn-id="' . $id . '" href="' . $href . '" aria-label="' . $tooltip . '" title="' . $tooltip . '"' . ( $extra ? ' ' . $extra : '' ) . '>';
     echo $icon_html;
