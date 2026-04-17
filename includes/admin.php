@@ -92,7 +92,7 @@ function fbpro_admin_page() {
             <h1>
                 <span class="fbpro-admin-logo">FB</span>
                 Floating Buttons Pro
-                <span class="fbpro-version">v<?php echo FBPRO_VERSION; ?></span>
+                <span class="fbpro-version">v<?php echo esc_html( FBPRO_VERSION ); ?></span>
             </h1>
             <p class="fbpro-admin-subtitle">Compatible con Divi &amp; Elementor</p>
         </div>
@@ -154,7 +154,7 @@ function fbpro_admin_page() {
                             ];
                             foreach ( $corners as $val => $lbl ) {
                                 $sel = selected( $global['position_corner'], $val, false );
-                                echo "<option value='{$val}'{$sel}>{$lbl}</option>";
+                                printf( '<option value="%s"%s>%s</option>', esc_attr( $val ), $sel, esc_html( $lbl ) );
                             }
                             ?>
                         </select>
@@ -269,69 +269,6 @@ function fbpro_verify_nonce() {
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( [ 'message' => 'Permission denied' ], 403 );
     }
-}
-
-function fbpro_sanitize_css_class( $value ) {
-    if ( empty( $value ) ) return '';
-    $classes = preg_split( '/\s+/', trim( $value ) );
-    $clean   = [];
-    foreach ( $classes as $class ) {
-        $s = sanitize_html_class( $class );
-        if ( $s !== '' ) $clean[] = $s;
-    }
-    return implode( ' ', $clean );
-}
-
-function fbpro_sanitize_button( $raw ) {
-    $svgs    = array_keys( fbpro_icon_library() );
-    $corners = [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ];
-
-    return [
-        'id'             => sanitize_text_field( $raw['id'] ?? '' ),
-        'active'         => ! empty( $raw['active'] ),
-        'order'          => absint( $raw['order'] ?? 0 ),
-        'label'          => sanitize_text_field( $raw['label'] ?? 'Nuevo botón' ),
-
-        'action_type'    => in_array( $raw['action_type'] ?? '', [ 'link', 'popup' ] ) ? $raw['action_type'] : 'link',
-        'url'            => esc_url_raw( $raw['url'] ?? '' ),
-        'target'         => in_array( $raw['target'] ?? '', [ '_self', '_blank' ] ) ? $raw['target'] : '_blank',
-        'tooltip'        => sanitize_text_field( $raw['tooltip'] ?? '' ),
-        'custom_class'   => fbpro_sanitize_css_class( $raw['custom_class'] ?? '' ),
-
-        'icon_type'      => in_array( $raw['icon_type'] ?? '', [ 'svg', 'image' ] ) ? $raw['icon_type'] : 'svg',
-        'icon_svg'       => in_array( $raw['icon_svg'] ?? '', $svgs ) ? $raw['icon_svg'] : 'phone',
-        'icon_image_id'  => absint( $raw['icon_image_id'] ?? 0 ),
-        'icon_size'      => max( 10, min( 90, absint( $raw['icon_size'] ?? 46 ) ) ),
-        'image_fit'      => in_array( $raw['image_fit'] ?? '', [ 'cover', 'contain', 'fill' ] ) ? $raw['image_fit'] : 'cover',
-
-        'bg_type'        => in_array( $raw['bg_type'] ?? '', [ 'solid', 'gradient' ] ) ? $raw['bg_type'] : 'solid',
-        'bg_color'       => sanitize_hex_color( $raw['bg_color'] ?? '#2A90A0' ) ?: '#2A90A0',
-        'gradient_from'  => sanitize_hex_color( $raw['gradient_from'] ?? '#2A90A0' ) ?: '#2A90A0',
-        'gradient_to'    => sanitize_hex_color( $raw['gradient_to']   ?? '#1a6e7e' ) ?: '#1a6e7e',
-        'gradient_angle' => max( 0, min( 360, absint( $raw['gradient_angle'] ?? 135 ) ) ),
-        'icon_color'     => sanitize_hex_color( $raw['icon_color'] ?? '#ffffff' ) ?: '#ffffff',
-        'size'           => max( 32, min( 120, absint( $raw['size'] ?? 56 ) ) ),
-        'radius'         => min( 100, absint( $raw['radius'] ?? 16 ) ),
-        'shadow'         => min( 3, absint( $raw['shadow'] ?? 2 ) ),
-
-        'hover_effect'   => in_array( $raw['hover_effect'] ?? '', [ 'scale', 'pulse', 'brightness', 'none' ] ) ? $raw['hover_effect'] : 'scale',
-
-        'popup_mode'     => in_array( $raw['popup_mode'] ?? '', [ 'shortcode', 'html' ] ) ? $raw['popup_mode'] : 'shortcode',
-        'popup_content'  => wp_kses_post( $raw['popup_content'] ?? '' ),
-        'popup_css'      => sanitize_textarea_field( $raw['popup_css'] ?? '' ),
-        'popup_pages'    => sanitize_textarea_field( $raw['popup_pages'] ?? '' ),
-
-        'hide_mobile'    => ! empty( $raw['hide_mobile'] ),
-        'hide_desktop'   => ! empty( $raw['hide_desktop'] ),
-        'hide_on'        => sanitize_textarea_field( $raw['hide_on'] ?? '' ),
-        'schedule_enabled' => ! empty( $raw['schedule_enabled'] ),
-        'schedule_days'    => array_values( array_filter(
-            array_unique( array_map( 'intval', (array)( $raw['schedule_days'] ?? [] ) ) ),
-            function ( $d ) { return $d >= 1 && $d <= 7; }
-        ) ),
-        'schedule_from'    => preg_match( '/^\d{2}:\d{2}$/', $raw['schedule_from'] ?? '' ) ? $raw['schedule_from'] : '09:00',
-        'schedule_to'      => preg_match( '/^\d{2}:\d{2}$/', $raw['schedule_to']   ?? '' ) ? $raw['schedule_to']   : '20:00',
-    ];
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -635,19 +572,3 @@ function fbpro_ajax_import_config() {
     ] );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   HELPER: SANITIZAR ARRAY DE BOTONES (para import)
-   ═══════════════════════════════════════════════════════════════ */
-function fbpro_sanitize_buttons_array( $buttons ) {
-    if ( ! is_array( $buttons ) ) return [];
-    $clean = [];
-    foreach ( $buttons as $btn ) {
-        if ( ! is_array( $btn ) ) continue;
-        $sanitized = fbpro_sanitize_button( $btn );
-        if ( empty( $sanitized['id'] ) ) {
-            $sanitized['id'] = fbpro_generate_uid();
-        }
-        $clean[] = $sanitized;
-    }
-    return $clean;
-}

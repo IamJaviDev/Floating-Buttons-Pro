@@ -596,13 +596,6 @@
       $(document).on('click', '#fbpro-modal-close, #fbpro-modal-cancel', function () {
         self.closeModal();
       });
-      $(document).on('click', '#fbpro-modal', function (e) {
-        if ($(e.target).is('#fbpro-modal') && !$('.media-modal:visible').length) self.closeModal();
-      });
-      $(document).on('keydown', function (e) {
-        // No cerrar el modal de FBPro si el media picker de WP está abierto
-        if (e.key === 'Escape' && !$('.media-modal:visible').length) self.closeModal();
-      });
 
       /* ── Modal: sub-tabs ──────────────────────────────────── */
       $(document).on('click', '.fbpro-mtab', function () {
