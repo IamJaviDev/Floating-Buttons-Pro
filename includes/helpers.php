@@ -48,6 +48,31 @@ function fbpro_button_defaults() {
         'schedule_days'    => [1,2,3,4,5,6,7],
         'schedule_from'    => '09:00',
         'schedule_to'      => '20:00',
+        // Bocadillo
+        'bubble' => [
+            'enabled'          => false,
+            'title'            => '',
+            'message'          => '',
+            'delay'            => 3,
+            'auto_close'       => 0,
+            'closable'         => true,
+            'close_on_outside' => false,
+            'remember_close'   => true,
+            'position'         => 'left',
+            'show_arrow'       => true,
+            'bg_color'         => '#ffffff',
+            'title_color'      => '#1a1a2e',
+            'text_color'       => '#4b5563',
+            'border_color'     => '#e5e7eb',
+            'border_width'     => 1,
+            'border_radius'    => 12,
+            'title_size'       => 15,
+            'text_size'        => 13,
+            'padding'          => 14,
+            'max_width'        => 240,
+            'shadow'           => '2',
+            'animation'        => 'fade',
+        ],
     ];
 }
 
@@ -110,6 +135,16 @@ function fbpro_shadow( $hex, $level ) {
         case '2': return "0 4px 14px {$c}, 0 1px 3px rgba(0,0,0,.12)";
         case '3': return "0 6px 24px {$c}, 0 2px 8px rgba(0,0,0,.18)";
         default:  return "0 4px 14px {$c}";
+    }
+}
+
+function fbpro_bubble_shadow( $level ) {
+    switch ( (string) $level ) {
+        case '0': return 'none';
+        case '1': return '0 2px 8px rgba(0,0,0,.10)';
+        case '2': return '0 4px 14px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.08)';
+        case '3': return '0 6px 24px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.14)';
+        default:  return '0 4px 14px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.08)';
     }
 }
 
@@ -317,6 +352,39 @@ function fbpro_scope_popup_css( $raw_css, $popup_id ) {
    llaman a estas funciones en lugar de sanitizar inline.
    ═══════════════════════════════════════════════════════════════ */
 
+function fbpro_sanitize_bubble( $raw ) {
+    if ( ! is_array( $raw ) ) $raw = [];
+    return [
+        'enabled'          => ! empty( $raw['enabled'] ),
+        'title'            => sanitize_text_field( $raw['title'] ?? '' ),
+        'message'          => wp_kses( $raw['message'] ?? '', [
+            'strong' => [], 'em' => [], 'br' => [], 'b' => [], 'i' => [],
+        ]),
+        'delay'            => max( 0, min( 60, absint( $raw['delay'] ?? 3 ) ) ),
+        'auto_close'       => max( 0, min( 120, absint( $raw['auto_close'] ?? 0 ) ) ),
+        'closable'         => ! empty( $raw['closable'] ),
+        'close_on_outside' => ! empty( $raw['close_on_outside'] ),
+        'remember_close'   => ! empty( $raw['remember_close'] ),
+        'position'         => in_array( $raw['position'] ?? 'left', ['left','right','top','bottom'], true )
+                              ? $raw['position'] : 'left',
+        'show_arrow'       => ! empty( $raw['show_arrow'] ),
+        'bg_color'         => sanitize_hex_color( $raw['bg_color'] ?? '#ffffff' ) ?: '#ffffff',
+        'title_color'      => sanitize_hex_color( $raw['title_color'] ?? '#1a1a2e' ) ?: '#1a1a2e',
+        'text_color'       => sanitize_hex_color( $raw['text_color'] ?? '#4b5563' ) ?: '#4b5563',
+        'border_color'     => sanitize_hex_color( $raw['border_color'] ?? '#e5e7eb' ) ?: '#e5e7eb',
+        'border_width'     => max( 0, min( 10, absint( $raw['border_width'] ?? 1 ) ) ),
+        'border_radius'    => max( 0, min( 50, absint( $raw['border_radius'] ?? 12 ) ) ),
+        'title_size'       => max( 10, min( 32, absint( $raw['title_size'] ?? 15 ) ) ),
+        'text_size'        => max( 10, min( 24, absint( $raw['text_size'] ?? 13 ) ) ),
+        'padding'          => max( 4, min( 40, absint( $raw['padding'] ?? 14 ) ) ),
+        'max_width'        => max( 100, min( 500, absint( $raw['max_width'] ?? 240 ) ) ),
+        'shadow'           => in_array( (string)( $raw['shadow'] ?? '2' ), ['0','1','2','3'], true )
+                              ? (string) $raw['shadow'] : '2',
+        'animation'        => in_array( $raw['animation'] ?? 'fade', ['fade','slide','bounce','none'], true )
+                              ? $raw['animation'] : 'fade',
+    ];
+}
+
 function fbpro_sanitize_css_class( $value ) {
     if ( empty( $value ) ) return '';
     $classes = preg_split( '/\s+/', trim( $value ) );
@@ -393,6 +461,8 @@ function fbpro_sanitize_button( $raw ) {
         'schedule_days'    => fbpro_sanitize_schedule_days( $raw['schedule_days'] ?? [] ),
         'schedule_from'    => fbpro_sanitize_time( $raw['schedule_from'] ?? '09:00' ),
         'schedule_to'      => fbpro_sanitize_time( $raw['schedule_to']   ?? '20:00' ),
+
+        'bubble'           => fbpro_sanitize_bubble( $raw['bubble'] ?? [] ),
     ];
 }
 
@@ -462,8 +532,8 @@ function fbpro_generate_css() {
 
         // Pulse ring
         $pulse = $global['pulse_ring']
-            ? "[data-btn-id=\"{$id}\"]::before { display:block; background:{$bg}; border-radius:{$radius}px; width:{$size}px; height:{$size}px; }"
-            : "[data-btn-id=\"{$id}\"]::before { display:none !important; }";
+            ? ".fbpro-btn[data-btn-id=\"{$id}\"]::before { display:block; background:{$bg}; border-radius:{$radius}px; width:{$size}px; height:{$size}px; }"
+            : ".fbpro-btn[data-btn-id=\"{$id}\"]::before { display:none !important; }";
 
         // Hover
         $hover       = $btn['hover_effect'] ?? 'scale';
@@ -477,7 +547,7 @@ function fbpro_generate_css() {
         $hide_desk = ! empty( $btn['hide_desktop'] );
 
         $css .= "
-[data-btn-id=\"{$id}\"] {
+.fbpro-btn[data-btn-id=\"{$id}\"] {
     background: {$bg} !important;
     width: {$size}px !important;
     height: {$size}px !important;
@@ -485,12 +555,12 @@ function fbpro_generate_css() {
     box-shadow: {$shadow} !important;
     {$entrance}
 }
-[data-btn-id=\"{$id}\"] svg {
+.fbpro-btn[data-btn-id=\"{$id}\"] svg {
     fill: {$icon_color} !important;
     width: {$icon_size}% !important;
     height: {$icon_size}% !important;
 }
-[data-btn-id=\"{$id}\"] .fbpro-btn__img {
+.fbpro-btn[data-btn-id=\"{$id}\"] .fbpro-btn__img {
     width: {$icon_size}% !important;
     height: {$icon_size}% !important;
     object-fit: {$image_fit} !important;
@@ -498,18 +568,56 @@ function fbpro_generate_css() {
     border-radius: inherit !important;
     pointer-events: none !important;
 }
-[data-btn-id=\"{$id}\"]:hover,
-[data-btn-id=\"{$id}\"]:focus-visible {
+.fbpro-btn[data-btn-id=\"{$id}\"]:hover,
+.fbpro-btn[data-btn-id=\"{$id}\"]:focus-visible {
     background: {$bg} !important;
     {$h_transform}
     {$h_filter}
 }
 {$pulse}
 ";
-        if ( $hide_mob )  $css .= "@media(max-width:768px){ [data-btn-id=\"{$id}\"]{display:none!important;} }\n";
-        if ( $hide_desk ) $css .= "@media(min-width:769px){ [data-btn-id=\"{$id}\"]{display:none!important;} }\n";
+        if ( $hide_mob )  $css .= "@media(max-width:768px){ [data-wrapper-id=\"{$id}\"]{display:none!important;} }\n";
+        if ( $hide_desk ) $css .= "@media(min-width:769px){ [data-wrapper-id=\"{$id}\"]{display:none!important;} }\n";
 
         $active_index++;
+    }
+
+    // Bubble CSS per button
+    foreach ( $buttons as $btn ) {
+        if ( empty( $btn['active'] ) ) continue;
+        if ( empty( $btn['bubble']['enabled'] ) ) continue;
+
+        $id = esc_attr( $btn['id'] );
+        $b  = $btn['bubble'];
+
+        $bg           = sanitize_hex_color( $b['bg_color']     ?? '#ffffff' ) ?: '#ffffff';
+        $text_color   = sanitize_hex_color( $b['text_color']   ?? '#4b5563' ) ?: '#4b5563';
+        $border_color = sanitize_hex_color( $b['border_color'] ?? '#e5e7eb' ) ?: '#e5e7eb';
+        $title_color  = sanitize_hex_color( $b['title_color']  ?? '#1a1a2e' ) ?: '#1a1a2e';
+        $bw           = absint( $b['border_width']  ?? 1 );
+        $br           = absint( $b['border_radius'] ?? 12 );
+        $padding      = absint( $b['padding']   ?? 14 );
+        $max_width    = absint( $b['max_width']  ?? 240 );
+        $text_size    = absint( $b['text_size']  ?? 13 );
+        $title_size   = absint( $b['title_size'] ?? 15 );
+        $shadow       = fbpro_bubble_shadow( $b['shadow'] ?? '2' );
+
+        $css .= "
+.fbpro-bubble[data-bubble-id=\"{$id}\"] {
+    background: {$bg};
+    color: {$text_color};
+    border: {$bw}px solid {$border_color};
+    border-radius: {$br}px;
+    padding: {$padding}px;
+    max-width: {$max_width}px;
+    font-size: {$text_size}px;
+    box-shadow: {$shadow};
+}
+.fbpro-bubble[data-bubble-id=\"{$id}\"] .fbpro-bubble__title {
+    color: {$title_color};
+    font-size: {$title_size}px;
+}
+";
     }
 
     set_transient( $cache_key, $css, DAY_IN_SECONDS );

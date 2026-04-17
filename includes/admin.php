@@ -241,6 +241,7 @@ function fbpro_admin_page() {
                 <button class="fbpro-mtab" data-mtab="icono">Icono</button>
                 <button class="fbpro-mtab" data-mtab="estilo">Estilo</button>
                 <button class="fbpro-mtab" data-mtab="popup">Popup</button>
+                <button class="fbpro-mtab" data-mtab="bocadillo">Bocadillo</button>
                 <button class="fbpro-mtab" data-mtab="visibilidad">Visibilidad</button>
                 <button class="fbpro-mtab" data-mtab="horario">Horario</button>
             </div>

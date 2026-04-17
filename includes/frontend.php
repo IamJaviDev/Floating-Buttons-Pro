@@ -78,8 +78,8 @@ function fbpro_render_button( $btn ) {
     $icon_html    = fbpro_render_icon( $btn );
     $custom_class = ! empty( $btn['custom_class'] ) ? ' ' . esc_attr( $btn['custom_class'] ) : '';
 
-    $schedule_attrs  = '';
-    $initial_display = '';
+    $schedule_attrs = '';
+    $wrapper_style  = '';
     if ( ! empty( $btn['schedule_enabled'] ) ) {
         $days = implode( ',', array_map( 'intval', (array)( $btn['schedule_days'] ?? [] ) ) );
         $schedule_attrs = sprintf(
@@ -88,15 +88,58 @@ function fbpro_render_button( $btn ) {
             esc_attr( $btn['schedule_from'] ?? '00:00' ),
             esc_attr( $btn['schedule_to']   ?? '23:59' )
         );
-        $initial_display = ' style="display:none"';
+        $wrapper_style = ' style="display:none"';
     }
 
-    echo '<a class="fbpro-btn' . $custom_class . '" data-btn-id="' . $id . '" href="' . $href . '" aria-label="' . $tooltip . '" title="' . $tooltip . '"' . ( $extra ? ' ' . $extra : '' ) . $schedule_attrs . $initial_display . '>';
+    $bubble     = $btn['bubble'] ?? [];
+    $has_bubble = ! empty( $bubble['enabled'] ) && ! empty( $bubble['message'] );
+
+    echo '<div class="fbpro-btn-wrapper" data-wrapper-id="' . $id . '"' . $wrapper_style . '>';
+    echo '<a class="fbpro-btn' . $custom_class . '" data-btn-id="' . $id . '" href="' . $href . '" aria-label="' . $tooltip . '" title="' . $tooltip . '"' . ( $extra ? ' ' . $extra : '' ) . $schedule_attrs . '>';
     echo $icon_html;
     if ( $tooltip ) {
         echo '<span class="fbpro-tooltip">' . esc_html( $btn['tooltip'] ) . '</span>';
     }
     echo '</a>';
+    if ( $has_bubble ) {
+        fbpro_render_bubble( $id, $bubble );
+    }
+    echo '</div>';
+}
+
+function fbpro_render_bubble( $btn_id, $bubble ) {
+    $pos  = in_array( $bubble['position'] ?? 'left', ['left','right','top','bottom'], true ) ? $bubble['position'] : 'left';
+    $anim = in_array( $bubble['animation'] ?? 'fade', ['fade','slide','bounce','none'], true ) ? $bubble['animation'] : 'fade';
+    $delay = absint( $bubble['delay'] ?? 3 );
+    $ac    = absint( $bubble['auto_close'] ?? 0 );
+    $rem   = ! empty( $bubble['remember_close'] ) ? '1' : '0';
+    $out   = ! empty( $bubble['close_on_outside'] ) ? '1' : '0';
+    ?>
+    <div class="fbpro-bubble fbpro-bubble--<?php echo esc_attr( $pos ); ?> fbpro-bubble--anim-<?php echo esc_attr( $anim ); ?>"
+         data-bubble-id="<?php echo esc_attr( $btn_id ); ?>"
+         data-delay="<?php echo $delay; ?>"
+         data-auto-close="<?php echo $ac; ?>"
+         data-remember-close="<?php echo $rem; ?>"
+         data-close-on-outside="<?php echo $out; ?>"
+         style="display:none">
+        <?php if ( ! empty( $bubble['show_arrow'] ) ) : ?>
+        <span class="fbpro-bubble__arrow"></span>
+        <?php endif; ?>
+        <?php if ( ! empty( $bubble['title'] ) ) : ?>
+        <div class="fbpro-bubble__title"><?php echo esc_html( $bubble['title'] ); ?></div>
+        <?php endif; ?>
+        <div class="fbpro-bubble__message"><?php echo wp_kses( $bubble['message'], [
+            'strong' => [], 'em' => [], 'br' => [], 'b' => [], 'i' => [],
+        ] ); ?></div>
+        <?php if ( ! empty( $bubble['closable'] ) ) : ?>
+        <button class="fbpro-bubble__close" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" width="14" height="14">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            </svg>
+        </button>
+        <?php endif; ?>
+    </div>
+    <?php
 }
 
 /* ═══════════════════════════════════════════════════════════════
