@@ -38,8 +38,10 @@
   pointer-events: none;
 }
 .fbpro-btn .fbpro-btn__img {
-  object-fit: contain;
   display: block;
+  object-fit: cover;
+  object-position: center;
+  border-radius: inherit;
 }
 
 /* ── Tooltip ─────────────────────────────────────────────────── */

@@ -15,13 +15,19 @@ function fbpro_button_defaults() {
         'url'            => '',
         'target'         => '_blank',
         'tooltip'        => '',
+        'custom_class'   => '',
         // Icono
         'icon_type'      => 'svg',
         'icon_svg'       => 'phone',
         'icon_image_id'  => 0,
         'icon_size'      => 46,
+        'image_fit'      => 'cover',
         // Estilo
+        'bg_type'        => 'solid',
         'bg_color'       => '#2A90A0',
+        'gradient_from'  => '#2A90A0',
+        'gradient_to'    => '#1a6e7e',
+        'gradient_angle' => 135,
         'icon_color'     => '#ffffff',
         'size'           => 56,
         'radius'         => 16,
@@ -37,6 +43,11 @@ function fbpro_button_defaults() {
         'hide_mobile'    => false,
         'hide_desktop'   => false,
         'hide_on'        => '',
+        // Programación horaria
+        'schedule_enabled' => false,
+        'schedule_days'    => [1,2,3,4,5,6,7],
+        'schedule_from'    => '09:00',
+        'schedule_to'      => '20:00',
     ];
 }
 
@@ -147,15 +158,24 @@ function fbpro_rule_matches_current( $rule, $current ) {
 function fbpro_button_visible( $btn ) {
     if ( empty( $btn['active'] ) ) return false;
 
+    $current = rtrim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
+
+    // Popup buttons: popup_pages controls where the button (and popup) appears
+    if ( ( $btn['action_type'] ?? 'link' ) === 'popup' ) {
+        $rules = trim( $btn['popup_pages'] ?? '' );
+        if ( empty( $rules ) ) return true;
+        foreach ( array_filter( array_map( 'trim', explode( "\n", $rules ) ) ) as $rule ) {
+            if ( fbpro_rule_matches_current( $rule, $current ) ) return true;
+        }
+        return false;
+    }
+
+    // Link buttons: hide_on exclusion list
     $rules = trim( $btn['hide_on'] ?? '' );
     if ( empty( $rules ) ) return true;
 
-    $current = rtrim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
-
     foreach ( array_filter( array_map( 'trim', explode( "\n", $rules ) ) ) as $rule ) {
-        if ( fbpro_rule_matches_current( $rule, $current ) ) {
-            return false;
-        }
+        if ( fbpro_rule_matches_current( $rule, $current ) ) return false;
     }
 
     return true;
@@ -309,13 +329,25 @@ function fbpro_generate_css() {
     foreach ( $buttons as $btn ) {
         if ( empty( $btn['active'] ) ) continue;
 
-        $id         = esc_attr( $btn['id'] );
-        $bg         = sanitize_hex_color( $btn['bg_color'] ?? '#2A90A0' ) ?: '#2A90A0';
-        $size       = absint( $btn['size'] ?? 56 ) ?: 56;
+        $id   = esc_attr( $btn['id'] );
+        $size = absint( $btn['size'] ?? 56 ) ?: 56;
+
+        if ( ( $btn['bg_type'] ?? 'solid' ) === 'gradient' ) {
+            $from         = sanitize_hex_color( $btn['gradient_from'] ?? '#2A90A0' ) ?: '#2A90A0';
+            $to           = sanitize_hex_color( $btn['gradient_to']   ?? '#1a6e7e' ) ?: '#1a6e7e';
+            $ang          = max( 0, min( 360, absint( $btn['gradient_angle'] ?? 135 ) ) );
+            $bg           = "linear-gradient({$ang}deg, {$from}, {$to})";
+            $shadow_color = $from;
+        } else {
+            $bg           = sanitize_hex_color( $btn['bg_color'] ?? '#2A90A0' ) ?: '#2A90A0';
+            $shadow_color = $bg;
+        }
+
         $radius     = absint( $btn['radius'] ?? 16 );
-        $shadow     = fbpro_shadow( $bg, $btn['shadow'] ?? 2 );
+        $shadow     = fbpro_shadow( $shadow_color, $btn['shadow'] ?? 2 );
         $icon_color = sanitize_hex_color( $btn['icon_color'] ?? '#ffffff' ) ?: '#ffffff';
         $icon_size  = absint( $btn['icon_size'] ?? 46 );
+        $image_fit  = in_array( $btn['image_fit'] ?? '', [ 'cover', 'contain', 'fill' ] ) ? $btn['image_fit'] : 'cover';
 
         // Animación de entrada con stagger
         $delay    = 0.3 + ( $active_index * 0.15 );
@@ -341,7 +373,7 @@ function fbpro_generate_css() {
 
         $css .= "
 [data-btn-id=\"{$id}\"] {
-    background-color: {$bg} !important;
+    background: {$bg} !important;
     width: {$size}px !important;
     height: {$size}px !important;
     border-radius: {$radius}px !important;
@@ -356,12 +388,14 @@ function fbpro_generate_css() {
 [data-btn-id=\"{$id}\"] .fbpro-btn__img {
     width: {$icon_size}% !important;
     height: {$icon_size}% !important;
-    object-fit: contain !important;
+    object-fit: {$image_fit} !important;
+    object-position: center !important;
+    border-radius: inherit !important;
     pointer-events: none !important;
 }
 [data-btn-id=\"{$id}\"]:hover,
 [data-btn-id=\"{$id}\"]:focus-visible {
-    background-color: {$bg} !important;
+    background: {$bg} !important;
     {$h_transform}
     {$h_filter}
 }

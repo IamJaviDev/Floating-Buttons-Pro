@@ -612,8 +612,140 @@ body.fbpro-modal-open { overflow: hidden; }
   font-size: 13px;
 }
 
+/* ── Schedule day pills ─────────────────────────────────────── */
+.fbpro-days-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.fbpro-day {
+  position: relative;
+  cursor: pointer;
+}
+.fbpro-day input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.fbpro-day span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  transition: background .18s, border-color .18s, color .18s;
+  user-select: none;
+}
+.fbpro-day input:checked + span {
+  background: #2A90A0;
+  border-color: #2A90A0;
+  color: #fff;
+}
+.fbpro-day:hover span { border-color: #2A90A0; }
+
+.fbpro-field input[type="time"] {
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #111;
+  background: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color .2s, box-shadow .2s;
+}
+.fbpro-field input[type="time"]:focus {
+  outline: none;
+  border-color: #2A90A0;
+  box-shadow: 0 0 0 3px rgba(42,144,160,.15);
+  background: #fff;
+}
+
+/* ── Tools tab ──────────────────────────────────────────────── */
+.fbpro-tools-section { padding: 4px 0 8px; }
+.fbpro-tools-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+}
+.fbpro-tools-desc {
+  font-size: 13px;
+  color: #4b5563;
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+.fbpro-tools-divider {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 20px 0;
+}
+.fbpro-tools-import-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fbpro-import-file-input {
+  font-size: 13px;
+  color: #374151;
+}
+
+/* ── Color row (picker + hex input) ────────────────────────── */
+.fbpro-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fbpro-color-row input[type="color"] {
+  width: 48px;
+  flex-shrink: 0;
+  height: 38px;
+  padding: 2px 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  cursor: pointer;
+  background: #fff;
+  box-sizing: border-box;
+}
+.fbpro-hex-input {
+  font-family: monospace !important;
+  font-size: 13px !important;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  flex: 1;
+}
+
+/* ── Gradient fields ─────────────────────────────────────────── */
+.fbpro-gradient-colors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.fbpro-gradient-angle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fbpro-gradient-angle-row span {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
 @media (max-width: 600px) {
   .fbpro-modal { width: 100vw; }
   .fbpro-grid-2 { grid-template-columns: 1fr; }
   .fbpro-svg-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
+  .fbpro-gradient-colors { grid-template-columns: 1fr; }
 }

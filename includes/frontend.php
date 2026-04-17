@@ -13,6 +13,10 @@ function fbpro_enqueue_frontend() {
     wp_enqueue_style( 'fbpro-style', FBPRO_URL . 'assets/frontend.css', [], FBPRO_VERSION );
     wp_add_inline_style( 'fbpro-style', fbpro_generate_css() );
     wp_enqueue_script( 'fbpro-script', FBPRO_URL . 'assets/frontend.js', [], FBPRO_VERSION, true );
+
+    wp_localize_script( 'fbpro-script', 'fbproFrontend', [
+        'timezoneOffset' => (int) ( wp_timezone()->getOffset( new DateTime( 'now', wp_timezone() ) ) / 60 ),
+    ] );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -71,9 +75,23 @@ function fbpro_render_button( $btn ) {
         $extra  = ltrim( $target );
     }
 
-    $icon_html = fbpro_render_icon( $btn );
+    $icon_html    = fbpro_render_icon( $btn );
+    $custom_class = ! empty( $btn['custom_class'] ) ? ' ' . esc_attr( $btn['custom_class'] ) : '';
 
-    echo '<a class="fbpro-btn" data-btn-id="' . $id . '" href="' . $href . '" aria-label="' . $tooltip . '" title="' . $tooltip . '"' . ( $extra ? ' ' . $extra : '' ) . '>';
+    $schedule_attrs  = '';
+    $initial_display = '';
+    if ( ! empty( $btn['schedule_enabled'] ) ) {
+        $days = implode( ',', array_map( 'intval', (array)( $btn['schedule_days'] ?? [] ) ) );
+        $schedule_attrs = sprintf(
+            ' data-schedule="1" data-schedule-days="%s" data-schedule-from="%s" data-schedule-to="%s"',
+            esc_attr( $days ),
+            esc_attr( $btn['schedule_from'] ?? '00:00' ),
+            esc_attr( $btn['schedule_to']   ?? '23:59' )
+        );
+        $initial_display = ' style="display:none"';
+    }
+
+    echo '<a class="fbpro-btn' . $custom_class . '" data-btn-id="' . $id . '" href="' . $href . '" aria-label="' . $tooltip . '" title="' . $tooltip . '"' . ( $extra ? ' ' . $extra : '' ) . $schedule_attrs . $initial_display . '>';
     echo $icon_html;
     if ( $tooltip ) {
         echo '<span class="fbpro-tooltip">' . esc_html( $btn['tooltip'] ) . '</span>';

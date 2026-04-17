@@ -46,7 +46,12 @@
     },
 
     cardHtml: function (btn) {
-      var bg     = btn.bg_color || '#2A90A0';
+      var bg;
+      if (btn.bg_type === 'gradient') {
+        bg = 'linear-gradient(' + (btn.gradient_angle || 135) + 'deg, ' + (btn.gradient_from || '#2A90A0') + ', ' + (btn.gradient_to || '#1a6e7e') + ')';
+      } else {
+        bg = btn.bg_color || '#2A90A0';
+      }
       var radius = btn.radius !== undefined ? btn.radius : 16;
       var size   = btn.size   || 56;
       // Scale radius to preview size
@@ -186,6 +191,7 @@
       $('#fbpro-modal-body').html(this.modalFormHtml(btn));
       this.updateActionFields();
       this.updateIconFields();
+      this.updateModalForActionType();
     },
 
     updateActionFields: function () {
@@ -203,6 +209,17 @@
       var action = $('input[name="fbpro_action_type"]:checked').val();
       $('#fbpro-popup-notice').toggle(action !== 'popup');
       $('#fbpro-popup-fields').toggle(action === 'popup');
+    },
+
+    updateModalForActionType: function () {
+      var isPopup = $('input[name="fbpro_action_type"]:checked').val() === 'popup';
+      $('[data-mtab="visibilidad"]').toggle(!isPopup);
+      var $dv = $('#fbpro-device-visibility');
+      if (isPopup) {
+        $('#fbpro-popup-device-slot').append($dv);
+      } else {
+        $('#fbpro-mp-visibilidad').prepend($dv);
+      }
     },
 
     modalFormHtml: function (btn) {
@@ -235,8 +252,34 @@
       });
       svgGrid += '</div>';
 
-      var isPopup  = btn.action_type === 'popup';
-      var isImage  = btn.icon_type === 'image';
+      var isPopup    = btn.action_type === 'popup';
+      var isImage    = btn.icon_type === 'image';
+      var isGradient = btn.bg_type === 'gradient';
+      var predefAngles  = [180, 90, 135, 225, 45, 315];
+      var angle         = btn.gradient_angle !== undefined ? btn.gradient_angle : 135;
+      var isCustomAngle = predefAngles.indexOf(angle) === -1;
+      var angleLabels   = {
+        180: 'Vertical (180°) — arriba a abajo',
+        90:  'Horizontal (90°) — izquierda a derecha',
+        135: 'Diagonal ↘ (135°)',
+        225: 'Diagonal ↙ (225°)',
+        45:  'Diagonal ↗ (45°)',
+        315: 'Diagonal ↖ (315°)'
+      };
+      var angleOptions = predefAngles.map(function (a) {
+        return '<option value="' + a + '"' + (!isCustomAngle && angle === a ? ' selected' : '') + '>' + angleLabels[a] + '</option>';
+      }).join('') + '<option value="custom"' + (isCustomAngle ? ' selected' : '') + '>Personalizado</option>';
+
+      var activeDays  = btn.schedule_days && btn.schedule_days.length ? btn.schedule_days : [1,2,3,4,5,6,7];
+      var dayLabels   = ['L','M','X','J','V','S','D'];
+      var daysHtml    = dayLabels.map(function (lbl, i) {
+        var val     = i + 1;
+        var checked = activeDays.indexOf(val) !== -1;
+        return '<label class="fbpro-day">' +
+          '<input type="checkbox" class="fbpro-day-check" value="' + val + '"' + (checked ? ' checked' : '') + '>' +
+          '<span>' + lbl + '</span>' +
+        '</label>';
+      }).join('');
 
       return [
         /* ── Contenido ─────────────────────────────────────── */
@@ -269,6 +312,11 @@
             '<label>Tooltip <small>(texto al pasar el ratón)</small></label>',
             '<input type="text" id="fbpro-field-tooltip" value="' + this.escAttr(btn.tooltip || '') + '" placeholder="Llamar ahora">',
           '</div>',
+          '<div class="fbpro-field">',
+            '<label>Clase CSS <small>(opcional)</small></label>',
+            '<input type="text" id="fbpro-field-custom-class" value="' + this.escAttr(btn.custom_class || '') + '" placeholder="mi-clase otra-clase">',
+            '<p class="fbpro-help">Una o varias clases separadas por espacios. Útil para estilos personalizados o eventos de tracking.</p>',
+          '</div>',
         '</div>',
 
         /* ── Icono ──────────────────────────────────────────── */
@@ -291,6 +339,14 @@
                 (btn.icon_image_url ? '<img id="fbpro-icon-image-preview" src="' + this.escAttr(btn.icon_image_url) + '" style="max-width:80px;max-height:80px;border-radius:8px;border:2px solid #e5e7eb;">' : ''),
               '</div>',
             '</div>',
+            '<div class="fbpro-field" style="margin-top:10px">',
+              '<label>Ajuste de la imagen</label>',
+              '<select id="fbpro-field-image-fit">',
+                '<option value="cover"'   + ((btn.image_fit || 'cover') === 'cover'   ? ' selected' : '') + '>Llenar (cover) — rellena sin deformar</option>',
+                '<option value="contain"' + ((btn.image_fit || 'cover') === 'contain' ? ' selected' : '') + '>Ajustar (contain) — muestra la imagen completa</option>',
+                '<option value="fill"'    + ((btn.image_fit || 'cover') === 'fill'    ? ' selected' : '') + '>Estirar (fill) — estira para llenar el botón</option>',
+              '</select>',
+            '</div>',
           '</div>',
           '<div class="fbpro-field" style="margin-top:16px">',
             '<label>Tamaño del icono (%)</label>',
@@ -301,14 +357,52 @@
 
         /* ── Estilo ─────────────────────────────────────────── */
         '<div class="fbpro-mpanel" id="fbpro-mp-estilo" style="display:none">',
-          '<div class="fbpro-grid-2">',
-            '<div class="fbpro-field">',
-              '<label>Color de fondo</label>',
-              '<input type="color" id="fbpro-field-bg-color" value="' + (btn.bg_color || '#2A90A0') + '">',
+          '<div class="fbpro-field">',
+            '<label>Fondo</label>',
+            '<label class="fbpro-toggle" style="margin-bottom:8px">',
+              '<input type="checkbox" id="fbpro-field-bg-gradient"' + (isGradient ? ' checked' : '') + '>',
+              '<span>Usar degradado</span>',
+            '</label>',
+            '<div id="fbpro-bg-solid"' + (isGradient ? ' style="display:none"' : '') + '>',
+              '<div class="fbpro-color-row">',
+                '<input type="color" id="fbpro-field-bg-color" value="' + (btn.bg_color || '#2A90A0') + '">',
+                '<input type="text" id="fbpro-field-bg-color-hex" class="fbpro-hex-input" value="' + (btn.bg_color || '#2A90A0').toUpperCase() + '" maxlength="7" placeholder="#2A90A0">',
+              '</div>',
             '</div>',
+            '<div id="fbpro-bg-gradient-fields"' + (!isGradient ? ' style="display:none"' : '') + '>',
+              '<div class="fbpro-gradient-colors">',
+                '<div class="fbpro-field">',
+                  '<label style="font-weight:500;font-size:12px">Color inicial</label>',
+                  '<div class="fbpro-color-row">',
+                    '<input type="color" id="fbpro-field-gradient-from" value="' + (btn.gradient_from || '#2A90A0') + '">',
+                    '<input type="text" id="fbpro-field-gradient-from-hex" class="fbpro-hex-input" value="' + (btn.gradient_from || '#2A90A0').toUpperCase() + '" maxlength="7">',
+                  '</div>',
+                '</div>',
+                '<div class="fbpro-field">',
+                  '<label style="font-weight:500;font-size:12px">Color final</label>',
+                  '<div class="fbpro-color-row">',
+                    '<input type="color" id="fbpro-field-gradient-to" value="' + (btn.gradient_to || '#1a6e7e') + '">',
+                    '<input type="text" id="fbpro-field-gradient-to-hex" class="fbpro-hex-input" value="' + (btn.gradient_to || '#1a6e7e').toUpperCase() + '" maxlength="7">',
+                  '</div>',
+                '</div>',
+              '</div>',
+              '<div class="fbpro-field">',
+                '<label style="font-weight:500;font-size:12px">Ángulo</label>',
+                '<select id="fbpro-field-gradient-angle-preset">' + angleOptions + '</select>',
+                '<div id="fbpro-gradient-angle-custom" class="fbpro-gradient-angle-row"' + (!isCustomAngle ? ' style="display:none"' : '') + '>',
+                  '<input type="number" id="fbpro-field-gradient-angle" min="0" max="360" value="' + angle + '" style="width:72px">',
+                  '<span>°</span>',
+                '</div>',
+              '</div>',
+            '</div>',
+          '</div>',
+          '<div class="fbpro-grid-2" style="margin-top:4px">',
             '<div class="fbpro-field">',
               '<label>Color del icono</label>',
-              '<input type="color" id="fbpro-field-icon-color" value="' + (btn.icon_color || '#ffffff') + '">',
+              '<div class="fbpro-color-row">',
+                '<input type="color" id="fbpro-field-icon-color" value="' + (btn.icon_color || '#ffffff') + '">',
+                '<input type="text" id="fbpro-field-icon-color-hex" class="fbpro-hex-input" value="' + (btn.icon_color || '#ffffff').toUpperCase() + '" maxlength="7">',
+              '</div>',
             '</div>',
             '<div class="fbpro-field">',
               '<label>Tamaño del botón (px)</label>',
@@ -353,7 +447,7 @@
               '<textarea id="fbpro-field-popup-content" rows="6" placeholder="[contact-form-7 id=&quot;123&quot; title=&quot;Contacto&quot;]">' + this.escHtml(btn.popup_content || '') + '</textarea>',
             '</div>',
             '<div class="fbpro-field">',
-              '<label>Mostrar popup solo en estas páginas <small>(vacío = todas)</small></label>',
+              '<label>Mostrar botón solo en estas páginas <small>(vacío = todas)</small></label>',
               '<textarea id="fbpro-field-popup-pages" rows="5" placeholder="/landing/&#10;posttype:ciudades">' + this.escHtml(btn.popup_pages || '') + '</textarea>',
               '<p class="fbpro-help">Una regla por línea. Vacío = aparece en toda la web.</p>',
             '</div>',
@@ -362,22 +456,25 @@
               '<textarea id="fbpro-field-popup-css" rows="8" class="fbpro-code-editor" placeholder=".mi-formulario { color: red; }&#10;input { border-radius: 6px; }">' + this.escHtml(btn.popup_css || '') + '</textarea>',
               '<p class="fbpro-help">Se aplica únicamente dentro de este popup. No afecta al resto de la web.</p>',
             '</div>',
+            '<div id="fbpro-popup-device-slot"></div>',
           '</div>',
         '</div>',
 
         /* ── Visibilidad ────────────────────────────────────── */
         '<div class="fbpro-mpanel" id="fbpro-mp-visibilidad" style="display:none">',
-          '<div class="fbpro-field">',
-            '<label class="fbpro-toggle">',
-              '<input type="checkbox" id="fbpro-field-hide-mobile" ' + (btn.hide_mobile ? 'checked' : '') + '>',
-              '<span>Ocultar en móvil <small>(&lt;768px)</small></span>',
-            '</label>',
-          '</div>',
-          '<div class="fbpro-field">',
-            '<label class="fbpro-toggle">',
-              '<input type="checkbox" id="fbpro-field-hide-desktop" ' + (btn.hide_desktop ? 'checked' : '') + '>',
-              '<span>Ocultar en escritorio <small>(&gt;768px)</small></span>',
-            '</label>',
+          '<div id="fbpro-device-visibility">',
+            '<div class="fbpro-field">',
+              '<label class="fbpro-toggle">',
+                '<input type="checkbox" id="fbpro-field-hide-mobile" ' + (btn.hide_mobile ? 'checked' : '') + '>',
+                '<span>Ocultar en móvil <small>(&lt;768px)</small></span>',
+              '</label>',
+            '</div>',
+            '<div class="fbpro-field">',
+              '<label class="fbpro-toggle">',
+                '<input type="checkbox" id="fbpro-field-hide-desktop" ' + (btn.hide_desktop ? 'checked' : '') + '>',
+                '<span>Ocultar en escritorio <small>(&gt;768px)</small></span>',
+              '</label>',
+            '</div>',
           '</div>',
           '<div class="fbpro-field" style="margin-top:16px">',
             '<label>Ocultar este botón en estas URLs</label>',
@@ -388,22 +485,67 @@
             '</div>',
           '</div>',
         '</div>',
+
+        /* ── Horario ─────────────────────────────────────────── */
+        '<div class="fbpro-mpanel" id="fbpro-mp-horario" style="display:none">',
+          '<div class="fbpro-field">',
+            '<label class="fbpro-toggle">',
+              '<input type="checkbox" id="fbpro-field-schedule-enabled"' + (btn.schedule_enabled ? ' checked' : '') + '>',
+              '<span>Activar programación horaria</span>',
+            '</label>',
+            '<p class="fbpro-help">Si está desactivado, el botón se muestra siempre.</p>',
+          '</div>',
+          '<div class="fbpro-schedule-config"' + (!btn.schedule_enabled ? ' style="display:none"' : '') + '>',
+            '<div class="fbpro-field">',
+              '<label>Días activos</label>',
+              '<div class="fbpro-days-group">',
+                daysHtml,
+              '</div>',
+            '</div>',
+            '<div class="fbpro-grid-2" style="margin-top:12px">',
+              '<div class="fbpro-field">',
+                '<label>Hora de inicio</label>',
+                '<input type="time" id="fbpro-field-schedule-from" value="' + (btn.schedule_from || '09:00') + '">',
+              '</div>',
+              '<div class="fbpro-field">',
+                '<label>Hora de fin</label>',
+                '<input type="time" id="fbpro-field-schedule-to" value="' + (btn.schedule_to || '20:00') + '">',
+              '</div>',
+            '</div>',
+            '<div class="fbpro-info-box" style="margin-top:14px">',
+              '<strong>Zona horaria:</strong> se usa la de WordPress',
+              ' (<code>' + self.escHtml((window.fbproData && fbproData.timezone) ? fbproData.timezone : 'UTC') + '</code>).',
+              ' Cámbiala en Ajustes → General.',
+            '</div>',
+          '</div>',
+        '</div>',
       ].join('');
     },
 
     collectModalData: function () {
+      var existing = this.editingId ? this.getButton(this.editingId) : null;
       return {
         id:             this.editingId || '',
+        order:          existing ? (existing.order || 0) : 0,
         label:          $('#fbpro-field-label').val(),
         action_type:    $('input[name="fbpro_action_type"]:checked').val() || 'link',
         url:            $('#fbpro-field-url').val(),
         target:         $('#fbpro-field-target').val() || '_blank',
         tooltip:        $('#fbpro-field-tooltip').val(),
+        custom_class:   $('#fbpro-field-custom-class').val(),
         icon_type:      $('input[name="fbpro_icon_type"]:checked').val() || 'svg',
         icon_svg:       $('input[name="fbpro_icon_svg"]:checked').val() || 'phone',
         icon_image_id:  parseInt($('#fbpro-field-icon-image-id').val() || 0, 10),
         icon_size:      parseInt($('#fbpro-field-icon-size').val() || 46, 10),
+        image_fit:      $('#fbpro-field-image-fit').val() || 'cover',
+        bg_type:        $('#fbpro-field-bg-gradient').prop('checked') ? 'gradient' : 'solid',
         bg_color:       $('#fbpro-field-bg-color').val() || '#2A90A0',
+        gradient_from:  $('#fbpro-field-gradient-from').val() || '#2A90A0',
+        gradient_to:    $('#fbpro-field-gradient-to').val() || '#1a6e7e',
+        gradient_angle: (function () {
+          var p = $('#fbpro-field-gradient-angle-preset').val();
+          return p === 'custom' ? parseInt($('#fbpro-field-gradient-angle').val() || 135, 10) : parseInt(p || 135, 10);
+        }()),
         icon_color:     $('#fbpro-field-icon-color').val() || '#ffffff',
         size:           parseInt($('#fbpro-field-size').val() || 56, 10),
         radius:         parseInt($('#fbpro-field-radius').val() || 16, 10),
@@ -416,7 +558,17 @@
         hide_mobile:    $('#fbpro-field-hide-mobile').prop('checked'),
         hide_desktop:   $('#fbpro-field-hide-desktop').prop('checked'),
         hide_on:        $('#fbpro-field-hide-on').val(),
-        active:         true,
+        schedule_enabled: $('#fbpro-field-schedule-enabled').prop('checked'),
+        schedule_days:    (function () {
+          var days = [];
+          $('#fbpro-mp-horario .fbpro-day-check:checked').each(function () {
+            days.push(parseInt($(this).val(), 10));
+          });
+          return days;
+        }()),
+        schedule_from:    $('#fbpro-field-schedule-from').val() || '09:00',
+        schedule_to:      $('#fbpro-field-schedule-to').val() || '20:00',
+        active:           true,
       };
     },
 
@@ -461,6 +613,7 @@
       $(document).on('change', 'input[name="fbpro_action_type"]', function () {
         self.updateActionFields();
         self.updatePopupPanel();
+        self.updateModalForActionType();
       });
 
       /* ── Modal: cambio tipo icono ─────────────────────────── */
@@ -636,6 +789,121 @@
         })
         .fail(function () { $status.text('Error de red').addClass('fbpro-status--err'); })
         .always(function () { $btn.prop('disabled', false).text('Guardar ajustes globales'); });
+      });
+
+      /* ── Exportar configuración ──────────────────────────────── */
+      $('#fbpro-export-btn').on('click', function () {
+        var $btn    = $(this).prop('disabled', true).text('Exportando…');
+        var $status = $('#fbpro-export-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
+
+        $.post(fbproData.ajaxUrl, {
+          action: 'fbpro_export_config',
+          nonce:  fbproData.nonce,
+        })
+        .done(function (r) {
+          if (!r.success) {
+            $status.text('Error al exportar').addClass('fbpro-status--err');
+            return;
+          }
+          var blob = new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' });
+          var url  = URL.createObjectURL(blob);
+          var a    = document.createElement('a');
+          var date = new Date().toISOString().split('T')[0];
+          a.href     = url;
+          a.download = 'fbpro-config-' + date + '.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          $status.text('✓ Descargado').addClass('fbpro-status--ok');
+          setTimeout(function () { $status.text(''); }, 3000);
+        })
+        .fail(function () { $status.text('Error de red').addClass('fbpro-status--err'); })
+        .always(function () { $btn.prop('disabled', false).text('Exportar configuración'); });
+      });
+
+      /* ── Importar configuración ───────────────────────────────── */
+      $('#fbpro-import-btn').on('click', function () {
+        var file = $('#fbpro-import-file')[0].files[0];
+        var $status = $('#fbpro-import-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
+
+        if (!file) {
+          $status.text('Selecciona un archivo JSON primero.').addClass('fbpro-status--err');
+          return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          var content = e.target.result;
+          var parsed;
+
+          try {
+            parsed = JSON.parse(content);
+          } catch (err) {
+            $status.text('El archivo no es un JSON válido.').addClass('fbpro-status--err');
+            return;
+          }
+
+          if (!parsed || parsed.plugin !== 'floating-buttons-pro') {
+            $status.text('Este archivo no pertenece a Floating Buttons Pro.').addClass('fbpro-status--err');
+            return;
+          }
+
+          var count = (parsed.buttons || []).length;
+          if (!confirm('Se importarán ' + count + ' botones. La configuración actual se sobrescribirá completamente. ¿Continuar?')) {
+            return;
+          }
+
+          var $btn = $('#fbpro-import-btn').prop('disabled', true).text('Importando…');
+
+          $.post(fbproData.ajaxUrl, {
+            action: 'fbpro_import_config',
+            nonce:  fbproData.nonce,
+            config: content,
+          })
+          .done(function (r) {
+            if (r.success) {
+              $status.text('✓ ' + r.data.message + ' (' + r.data.buttons_count + ' botones). Recargando…').addClass('fbpro-status--ok');
+              setTimeout(function () { location.reload(); }, 1500);
+            } else {
+              $status.text('Error: ' + (r.data && r.data.message ? r.data.message : 'desconocido')).addClass('fbpro-status--err');
+              $btn.prop('disabled', false).text('Importar');
+            }
+          })
+          .fail(function () {
+            $status.text('Error de red.').addClass('fbpro-status--err');
+            $btn.prop('disabled', false).text('Importar');
+          });
+        };
+        reader.readAsText(file);
+      });
+
+      /* ── Modal: schedule toggle ──────────────────────────────── */
+      $(document).on('change', '#fbpro-field-schedule-enabled', function () {
+        $(this).closest('.fbpro-mpanel').find('.fbpro-schedule-config').toggle(this.checked);
+      });
+
+      /* ── Modal: gradient toggle ───────────────────────────────── */
+      $(document).on('change', '#fbpro-field-bg-gradient', function () {
+        var isGrad = $(this).prop('checked');
+        $('#fbpro-bg-solid').toggle(!isGrad);
+        $('#fbpro-bg-gradient-fields').toggle(isGrad);
+      });
+
+      /* ── Modal: gradient angle preset ────────────────────────── */
+      $(document).on('change', '#fbpro-field-gradient-angle-preset', function () {
+        $('#fbpro-gradient-angle-custom').toggle($(this).val() === 'custom');
+      });
+
+      /* ── Color picker ↔ hex input ─────────────────────────────── */
+      $(document).on('input', '.fbpro-color-row input[type="color"]', function () {
+        $(this).closest('.fbpro-color-row').find('.fbpro-hex-input').val($(this).val().toUpperCase());
+      });
+      $(document).on('input', '.fbpro-color-row .fbpro-hex-input', function () {
+        var val = $(this).val().trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+          $(this).closest('.fbpro-color-row').find('input[type="color"]').val(val.toLowerCase());
+        }
       });
     },
 

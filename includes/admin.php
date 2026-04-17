@@ -56,6 +56,7 @@ function fbpro_admin_assets( $hook ) {
         'defaults'     => fbpro_button_defaults(),
         'setupPending' => (bool) get_option( 'fbpro_setup_pending' ),
         'cmSettings'   => $cm_settings ?: false,
+        'timezone'     => wp_timezone_string(),
     ] );
 }
 
@@ -115,6 +116,7 @@ function fbpro_admin_page() {
         <div class="fbpro-tabs">
             <button type="button" class="fbpro-tab active" data-tab="buttons">Botones</button>
             <button type="button" class="fbpro-tab" data-tab="global">Ajustes globales</button>
+            <button type="button" class="fbpro-tab" data-tab="tools">Herramientas</button>
         </div>
 
         <!-- ══ TAB: BOTONES ══ -->
@@ -197,6 +199,33 @@ function fbpro_admin_page() {
             </div>
         </div>
 
+        <!-- ══ TAB: HERRAMIENTAS ══ -->
+        <div class="fbpro-tab-panel" id="tab-tools">
+            <div class="fbpro-card">
+                <h2>Importar / Exportar configuración</h2>
+
+                <div class="fbpro-tools-section">
+                    <h3 class="fbpro-tools-heading">Exportar</h3>
+                    <p class="fbpro-tools-desc">Descarga toda tu configuración (botones y ajustes globales) como JSON para usarla en otra web.</p>
+                    <button type="button" id="fbpro-export-btn" class="fbpro-btn-primary">Exportar configuración</button>
+                    <span class="fbpro-save-status" id="fbpro-export-status" style="margin-left:10px"></span>
+                </div>
+
+                <hr class="fbpro-tools-divider">
+
+                <div class="fbpro-tools-section">
+                    <h3 class="fbpro-tools-heading">Importar</h3>
+                    <p class="fbpro-tools-desc">Sube un archivo JSON previamente exportado con este plugin. <strong>Esto reemplazará la configuración actual.</strong></p>
+                    <p class="fbpro-help" style="margin-bottom:10px">⚠ Las imágenes personalizadas no se transfieren entre webs distintas. Tendrás que volver a seleccionarlas manualmente tras importar.</p>
+                    <div class="fbpro-tools-import-row">
+                        <input type="file" id="fbpro-import-file" accept=".json" class="fbpro-import-file-input">
+                        <button type="button" id="fbpro-import-btn" class="fbpro-btn-secondary">Importar</button>
+                    </div>
+                    <span class="fbpro-save-status" id="fbpro-import-status" style="display:block;margin-top:8px"></span>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /fbpro-admin-wrap -->
 
     <!-- ══ MODAL EDICIÓN BOTÓN ══ -->
@@ -213,6 +242,7 @@ function fbpro_admin_page() {
                 <button class="fbpro-mtab" data-mtab="estilo">Estilo</button>
                 <button class="fbpro-mtab" data-mtab="popup">Popup</button>
                 <button class="fbpro-mtab" data-mtab="visibilidad">Visibilidad</button>
+                <button class="fbpro-mtab" data-mtab="horario">Horario</button>
             </div>
 
             <div class="fbpro-modal-body" id="fbpro-modal-body">
@@ -241,6 +271,17 @@ function fbpro_verify_nonce() {
     }
 }
 
+function fbpro_sanitize_css_class( $value ) {
+    if ( empty( $value ) ) return '';
+    $classes = preg_split( '/\s+/', trim( $value ) );
+    $clean   = [];
+    foreach ( $classes as $class ) {
+        $s = sanitize_html_class( $class );
+        if ( $s !== '' ) $clean[] = $s;
+    }
+    return implode( ' ', $clean );
+}
+
 function fbpro_sanitize_button( $raw ) {
     $svgs    = array_keys( fbpro_icon_library() );
     $corners = [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ];
@@ -255,13 +296,19 @@ function fbpro_sanitize_button( $raw ) {
         'url'            => esc_url_raw( $raw['url'] ?? '' ),
         'target'         => in_array( $raw['target'] ?? '', [ '_self', '_blank' ] ) ? $raw['target'] : '_blank',
         'tooltip'        => sanitize_text_field( $raw['tooltip'] ?? '' ),
+        'custom_class'   => fbpro_sanitize_css_class( $raw['custom_class'] ?? '' ),
 
         'icon_type'      => in_array( $raw['icon_type'] ?? '', [ 'svg', 'image' ] ) ? $raw['icon_type'] : 'svg',
         'icon_svg'       => in_array( $raw['icon_svg'] ?? '', $svgs ) ? $raw['icon_svg'] : 'phone',
         'icon_image_id'  => absint( $raw['icon_image_id'] ?? 0 ),
         'icon_size'      => max( 10, min( 90, absint( $raw['icon_size'] ?? 46 ) ) ),
+        'image_fit'      => in_array( $raw['image_fit'] ?? '', [ 'cover', 'contain', 'fill' ] ) ? $raw['image_fit'] : 'cover',
 
+        'bg_type'        => in_array( $raw['bg_type'] ?? '', [ 'solid', 'gradient' ] ) ? $raw['bg_type'] : 'solid',
         'bg_color'       => sanitize_hex_color( $raw['bg_color'] ?? '#2A90A0' ) ?: '#2A90A0',
+        'gradient_from'  => sanitize_hex_color( $raw['gradient_from'] ?? '#2A90A0' ) ?: '#2A90A0',
+        'gradient_to'    => sanitize_hex_color( $raw['gradient_to']   ?? '#1a6e7e' ) ?: '#1a6e7e',
+        'gradient_angle' => max( 0, min( 360, absint( $raw['gradient_angle'] ?? 135 ) ) ),
         'icon_color'     => sanitize_hex_color( $raw['icon_color'] ?? '#ffffff' ) ?: '#ffffff',
         'size'           => max( 32, min( 120, absint( $raw['size'] ?? 56 ) ) ),
         'radius'         => min( 100, absint( $raw['radius'] ?? 16 ) ),
@@ -277,6 +324,13 @@ function fbpro_sanitize_button( $raw ) {
         'hide_mobile'    => ! empty( $raw['hide_mobile'] ),
         'hide_desktop'   => ! empty( $raw['hide_desktop'] ),
         'hide_on'        => sanitize_textarea_field( $raw['hide_on'] ?? '' ),
+        'schedule_enabled' => ! empty( $raw['schedule_enabled'] ),
+        'schedule_days'    => array_values( array_filter(
+            array_unique( array_map( 'intval', (array)( $raw['schedule_days'] ?? [] ) ) ),
+            function ( $d ) { return $d >= 1 && $d <= 7; }
+        ) ),
+        'schedule_from'    => preg_match( '/^\d{2}:\d{2}$/', $raw['schedule_from'] ?? '' ) ? $raw['schedule_from'] : '09:00',
+        'schedule_to'      => preg_match( '/^\d{2}:\d{2}$/', $raw['schedule_to']   ?? '' ) ? $raw['schedule_to']   : '20:00',
     ];
 }
 
@@ -297,6 +351,7 @@ function fbpro_ajax_save_button() {
     $found = false;
     foreach ( $buttons as $i => $existing ) {
         if ( $existing['id'] === $btn['id'] && ! empty( $btn['id'] ) ) {
+            $btn['order'] = $existing['order']; // preserve drag-drop order
             $buttons[ $i ] = $btn;
             $found = true;
             break;
@@ -518,4 +573,81 @@ function fbpro_ajax_toggle_button() {
 
     fbpro_save_buttons( $buttons );
     wp_send_json_success( [] );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AJAX: EXPORTAR CONFIGURACIÓN
+   ═══════════════════════════════════════════════════════════════ */
+add_action( 'wp_ajax_fbpro_export_config', 'fbpro_ajax_export_config' );
+function fbpro_ajax_export_config() {
+    fbpro_verify_nonce();
+
+    wp_send_json_success( [
+        'plugin'      => 'floating-buttons-pro',
+        'version'     => FBPRO_VERSION,
+        'exported_at' => current_time( 'mysql' ),
+        'site_url'    => get_site_url(),
+        'buttons'     => fbpro_get_buttons(),
+        'global'      => fbpro_get_global(),
+    ] );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AJAX: IMPORTAR CONFIGURACIÓN
+   ═══════════════════════════════════════════════════════════════ */
+add_action( 'wp_ajax_fbpro_import_config', 'fbpro_ajax_import_config' );
+function fbpro_ajax_import_config() {
+    fbpro_verify_nonce();
+
+    $raw  = wp_unslash( $_POST['config'] ?? '' );
+    $data = json_decode( $raw, true );
+
+    if ( ! is_array( $data ) ) {
+        wp_send_json_error( [ 'message' => 'Archivo JSON inválido o corrupto' ] );
+    }
+    if ( empty( $data['plugin'] ) || $data['plugin'] !== 'floating-buttons-pro' ) {
+        wp_send_json_error( [ 'message' => 'Este archivo no pertenece a Floating Buttons Pro' ] );
+    }
+    if ( ! isset( $data['buttons'] ) || ! is_array( $data['buttons'] ) ) {
+        wp_send_json_error( [ 'message' => 'Estructura del JSON incorrecta: falta la clave "buttons"' ] );
+    }
+
+    $buttons = fbpro_sanitize_buttons_array( $data['buttons'] );
+    fbpro_save_buttons( $buttons );
+
+    // Importar ajustes globales (soporta clave "global" y también "settings" por compatibilidad)
+    $raw_global = $data['global'] ?? $data['settings'] ?? null;
+    if ( is_array( $raw_global ) ) {
+        $merged = wp_parse_args( $raw_global, fbpro_global_defaults() );
+        fbpro_save_global( [
+            'position_corner' => in_array( $merged['position_corner'] ?? '', [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ] )
+                ? $merged['position_corner'] : 'bottom-right',
+            'offset_x'        => max( 0, min( 200, absint( $merged['offset_x'] ?? 22 ) ) ),
+            'offset_y'        => max( 0, min( 200, absint( $merged['offset_y'] ?? 24 ) ) ),
+            'entrance_anim'   => ! empty( $merged['entrance_anim'] ),
+            'pulse_ring'      => ! empty( $merged['pulse_ring'] ),
+        ] );
+    }
+
+    wp_send_json_success( [
+        'message'       => 'Configuración importada correctamente',
+        'buttons_count' => count( $buttons ),
+    ] );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HELPER: SANITIZAR ARRAY DE BOTONES (para import)
+   ═══════════════════════════════════════════════════════════════ */
+function fbpro_sanitize_buttons_array( $buttons ) {
+    if ( ! is_array( $buttons ) ) return [];
+    $clean = [];
+    foreach ( $buttons as $btn ) {
+        if ( ! is_array( $btn ) ) continue;
+        $sanitized = fbpro_sanitize_button( $btn );
+        if ( empty( $sanitized['id'] ) ) {
+            $sanitized['id'] = fbpro_generate_uid();
+        }
+        $clean[] = $sanitized;
+    }
+    return $clean;
 }
