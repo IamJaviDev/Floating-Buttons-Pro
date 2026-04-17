@@ -1,0 +1,180 @@
+/* ═══════════════════════════════════════════════════════════════
+   Floating Buttons Pro – Frontend CSS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Wrapper ─────────────────────────────────────────────────── */
+.fbpro-wrapper {
+  position: fixed;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ── Base button ─────────────────────────────────────────────── */
+.fbpro-btn {
+  position: relative;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #fff !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  overflow: visible;
+  border: none !important;
+  outline: none;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.25s ease !important;
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
+}
+
+.fbpro-btn svg {
+  width: 46%;
+  height: 46%;
+  flex-shrink: 0;
+  pointer-events: none;
+  fill: #fff;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────── */
+.fbpro-tooltip {
+  position: absolute;
+  right: calc(100% + 10px);
+  left: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,.75);
+  color: #fff;
+  font-size: 12px;
+  font-family: sans-serif;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+/* Cuando el wrapper está en la izquierda, tooltip va a la derecha */
+.fbpro-wrapper--left .fbpro-tooltip {
+  right: auto;
+  left: calc(100% + 10px);
+}
+.fbpro-btn:hover .fbpro-tooltip {
+  opacity: 1;
+}
+
+/* ── Pulse ring ──────────────────────────────────────────────── */
+.fbpro-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: fbpro-pulse 2.8s ease-out infinite;
+  z-index: -1;
+}
+.fbpro-btn--wa::before {
+  animation-delay: 1.4s;
+}
+
+@keyframes fbpro-pulse {
+  0%   { transform: scale(1);   opacity: .5; }
+  60%  { transform: scale(1.8); opacity: 0;  }
+  100% { transform: scale(1.8); opacity: 0;  }
+}
+
+/* ── Entrada ─────────────────────────────────────────────────── */
+@keyframes fbpro-enter {
+  from { opacity: 0; transform: scale(0.4) translateY(20px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+/* ── Hover pulse keyframe ────────────────────────────────────── */
+@keyframes fbpro-hover-pulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  70%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+/* ── Active ──────────────────────────────────────────────────── */
+.fbpro-btn:active {
+  transform: scale(0.93) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POPUP OVERLAY
+   ═══════════════════════════════════════════════════════════════ */
+.fbpro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: rgba(0,0,0,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.fbpro-overlay.is-open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.fbpro-popup {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  padding: 40px 32px 32px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  transform: scale(0.92) translateY(16px);
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.fbpro-overlay.is-open .fbpro-popup {
+  transform: scale(1) translateY(0);
+}
+
+.fbpro-popup__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: #f0f0f0;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.2s, color 0.2s;
+  padding: 0;
+}
+.fbpro-popup__close:hover {
+  background: #e0e0e0;
+  color: #111;
+}
+.fbpro-popup__close svg {
+  fill: none;
+  stroke: currentColor;
+}
+
+.fbpro-popup__body {
+  margin-top: 4px;
+}
+
+/* ── Reduce motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .fbpro-btn,
+  .fbpro-btn::before,
+  .fbpro-overlay,
+  .fbpro-popup { animation: none !important; transition: none !important; }
+}
