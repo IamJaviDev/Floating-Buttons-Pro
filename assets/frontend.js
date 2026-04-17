@@ -1,32 +1,29 @@
-/* Floating Buttons Pro – Frontend JS */
+/* Floating Buttons Pro – Frontend JS v2.0 */
 (function () {
   'use strict';
 
   document.addEventListener('DOMContentLoaded', function () {
 
-    /* ── Popup ── */
+    /* ── Popups ──────────────────────────────────────────────── */
     document.querySelectorAll('[data-fbpro-popup]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
-        var id = 'fbpro-overlay-' + btn.dataset.fbproPopup;
-        var overlay = document.getElementById(id);
+        var id      = btn.dataset.fbproPopup;
+        var overlay = document.getElementById('fbpro-overlay-' + id);
         if (overlay) openPopup(overlay);
       });
     });
 
     document.querySelectorAll('.fbpro-overlay').forEach(function (overlay) {
-      // Cerrar con botón X
       var closeBtn = overlay.querySelector('.fbpro-popup__close');
       if (closeBtn) {
         closeBtn.addEventListener('click', function () { closePopup(overlay); });
       }
-      // Cerrar al clicar el fondo
       overlay.addEventListener('click', function (e) {
         if (e.target === overlay) closePopup(overlay);
       });
     });
 
-    // Cerrar con Escape
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         document.querySelectorAll('.fbpro-overlay.is-open').forEach(closePopup);

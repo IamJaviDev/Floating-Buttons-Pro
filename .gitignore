@@ -1,0 +1,54 @@
+# Claude Code local memory
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Node (si usas build tools)
+node_modules/
+dist/
+build/
+
+# Composer (si lo usas en el futuro)
+vendor/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDEs / Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# WordPress (por si trabajas dentro de wp-content)
+wp-config.php
+wp-content/uploads/
+wp-content/cache/
+
+# Archivos temporales
+*.tmp
+*.temp
+*.swp
+
+# Zip builds (si exportas el plugin)
+*.zip
+
+# Coverage / testing
+coverage/
+
+# Mac / Linux basura
+*.bak
+*.old
+
+# Opcional: ignora mapas si no los usas
+*.map
