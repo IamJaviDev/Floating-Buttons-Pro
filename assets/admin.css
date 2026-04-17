@@ -597,6 +597,13 @@
 
 body.fbpro-modal-open { overflow: hidden; }
 
+/* ── WP Media por encima del modal del plugin ────────────────── */
+/* La overlay del plugin usa z-index: 999999. WP media usa 160000.
+   Subimos WP media por encima para que los clics lleguen a la
+   biblioteca y no queden bloqueados por el drawer del plugin.   */
+.media-modal          { z-index: 1000001 !important; }
+.media-modal-backdrop { z-index: 1000000 !important; }
+
 /* ── Loading ─────────────────────────────────────────────────── */
 .fbpro-loading {
   text-align: center;

@@ -7,6 +7,7 @@
     buttons: [],
     editingId: null,
     activeMTab: 'contenido',
+    cmEditor: null,
 
     /* ── Init ──────────────────────────────────────────────── */
     init: function () {
@@ -159,6 +160,7 @@
     },
 
     closeModal: function () {
+      this.cmEditor = null;
       $('#fbpro-modal').attr('aria-hidden', 'true').removeClass('is-open');
       $('body').removeClass('fbpro-modal-open');
       this.editingId = null;
@@ -169,9 +171,18 @@
       $('.fbpro-mtab').removeClass('active').filter('[data-mtab="' + tab + '"]').addClass('active');
       $('.fbpro-mpanel').hide();
       $('#fbpro-mp-' + tab).show();
+
+      // Inicializar CodeMirror al mostrar el panel popup (solo una vez por apertura de modal)
+      if (tab === 'popup' && !this.cmEditor) {
+        var $ta = $('#fbpro-field-popup-css');
+        if ($ta.length && window.wp && wp.codeEditor && fbproData.cmSettings) {
+          this.cmEditor = wp.codeEditor.initialize($ta[0], fbproData.cmSettings);
+        }
+      }
     },
 
     renderModalForm: function (btn) {
+      this.cmEditor = null; // DOM will be replaced; CM instance is abandoned
       $('#fbpro-modal-body').html(this.modalFormHtml(btn));
       this.updateActionFields();
       this.updateIconFields();
@@ -346,6 +357,11 @@
               '<textarea id="fbpro-field-popup-pages" rows="5" placeholder="/landing/&#10;posttype:ciudades">' + this.escHtml(btn.popup_pages || '') + '</textarea>',
               '<p class="fbpro-help">Una regla por línea. Vacío = aparece en toda la web.</p>',
             '</div>',
+            '<div class="fbpro-field">',
+              '<label>CSS personalizado <small>(scoped a este popup)</small></label>',
+              '<textarea id="fbpro-field-popup-css" rows="8" class="fbpro-code-editor" placeholder=".mi-formulario { color: red; }&#10;input { border-radius: 6px; }">' + this.escHtml(btn.popup_css || '') + '</textarea>',
+              '<p class="fbpro-help">Se aplica únicamente dentro de este popup. No afecta al resto de la web.</p>',
+            '</div>',
           '</div>',
         '</div>',
 
@@ -395,6 +411,7 @@
         hover_effect:   $('input[name="fbpro_hover"]:checked').val() || 'scale',
         popup_mode:     $('#fbpro-field-popup-mode').val() || 'shortcode',
         popup_content:  $('#fbpro-field-popup-content').val(),
+        popup_css:      this.cmEditor ? this.cmEditor.codemirror.getValue() : ($('#fbpro-field-popup-css').val() || ''),
         popup_pages:    $('#fbpro-field-popup-pages').val(),
         hide_mobile:    $('#fbpro-field-hide-mobile').prop('checked'),
         hide_desktop:   $('#fbpro-field-hide-desktop').prop('checked'),
@@ -428,10 +445,11 @@
         self.closeModal();
       });
       $(document).on('click', '#fbpro-modal', function (e) {
-        if ($(e.target).is('#fbpro-modal')) self.closeModal();
+        if ($(e.target).is('#fbpro-modal') && !$('.media-modal:visible').length) self.closeModal();
       });
       $(document).on('keydown', function (e) {
-        if (e.key === 'Escape') self.closeModal();
+        // No cerrar el modal de FBPro si el media picker de WP está abierto
+        if (e.key === 'Escape' && !$('.media-modal:visible').length) self.closeModal();
       });
 
       /* ── Modal: sub-tabs ──────────────────────────────────── */
@@ -460,13 +478,14 @@
       $(document).on('click', '#fbpro-select-image-btn', function () {
         if (typeof wp === 'undefined' || !wp.media) return;
         var frame = wp.media({
-          title: 'Seleccionar imagen para el botón',
+          title: 'Selecciona una imagen o GIF',
           button: { text: 'Usar esta imagen' },
+          library: { type: ['image'] },
           multiple: false,
         });
         frame.on('select', function () {
           var att = frame.state().get('selection').first().toJSON();
-          $('#fbpro-field-icon-image-id').val(att.id);
+          $('#fbpro-field-icon-image-id').val(att.id).trigger('change');
           var $wrap = $('#fbpro-image-preview-wrap');
           $wrap.find('img').remove();
           $wrap.append('<img id="fbpro-icon-image-preview" src="' + att.url + '" style="max-width:80px;max-height:80px;border-radius:8px;border:2px solid #e5e7eb;margin-top:8px;">');

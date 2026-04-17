@@ -25,10 +25,14 @@ function fbpro_admin_assets( $hook ) {
     wp_enqueue_media();
     wp_enqueue_style( 'fbpro-admin-style', FBPRO_URL . 'assets/admin.css', [], FBPRO_VERSION );
     wp_enqueue_script( 'jquery-ui-sortable' );
+
+    // CodeMirror para el editor de CSS del popup
+    $cm_settings = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
+
     wp_enqueue_script(
         'fbpro-admin-script',
         FBPRO_URL . 'assets/admin.js',
-        [ 'jquery', 'jquery-ui-sortable' ],
+        [ 'jquery', 'jquery-ui-sortable', 'wp-codemirror' ],
         FBPRO_VERSION,
         true
     );
@@ -51,6 +55,7 @@ function fbpro_admin_assets( $hook ) {
         'svgLibrary'   => fbpro_icon_admin_data(),
         'defaults'     => fbpro_button_defaults(),
         'setupPending' => (bool) get_option( 'fbpro_setup_pending' ),
+        'cmSettings'   => $cm_settings ?: false,
     ] );
 }
 

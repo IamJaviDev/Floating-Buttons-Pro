@@ -112,6 +112,35 @@ function fbpro_corner_css( $corner, $ox, $oy ) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   URL / POSTTYPE RULE MATCHER
+   Soporta:
+     /ruta/exacta/       → coincidencia exacta (sin trailing slash)
+     /ruta/*             → coincide con /ruta y cualquier URL hija
+     posttype:nombre     → singular o archivo del post type
+   ═══════════════════════════════════════════════════════════════ */
+function fbpro_rule_matches_current( $rule, $current ) {
+    // posttype:nombre
+    if ( stripos( $rule, 'posttype:' ) === 0 ) {
+        $pt = trim( substr( $rule, 9 ) );
+        return ! empty( $pt ) && ( is_singular( $pt ) || is_post_type_archive( $pt ) );
+    }
+
+    // Wildcard: /ruta/* → coincide con /ruta y /ruta/hija/...
+    if ( substr( $rule, -2 ) === '/*' ) {
+        $prefix = rtrim( substr( $rule, 0, -2 ), '/' );
+        // normalizar $current al mismo formato
+        $c = '/' . ltrim( $current, '/' );
+        $p = '/' . ltrim( $prefix, '/' );
+        return $c === $p || strpos( $c, $p . '/' ) === 0;
+    }
+
+    // Exacta
+    $rule = rtrim( $rule, '/' );
+    return $current === $rule
+        || '/' . ltrim( $current, '/' ) === '/' . ltrim( $rule, '/' );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    VISIBILIDAD (FRONTEND)
    Devuelve true si el botón debe mostrarse en la página actual
    ═══════════════════════════════════════════════════════════════ */
@@ -124,17 +153,7 @@ function fbpro_button_visible( $btn ) {
     $current = rtrim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
 
     foreach ( array_filter( array_map( 'trim', explode( "\n", $rules ) ) ) as $rule ) {
-        $rule = rtrim( $rule, '/' );
-
-        if ( stripos( $rule, 'posttype:' ) === 0 ) {
-            $pt = trim( substr( $rule, 9 ) );
-            if ( ! empty( $pt ) && ( is_singular( $pt ) || is_post_type_archive( $pt ) ) ) {
-                return false;
-            }
-            continue;
-        }
-
-        if ( $current === $rule || '/' . ltrim( $current, '/' ) === '/' . ltrim( $rule, '/' ) ) {
+        if ( fbpro_rule_matches_current( $rule, $current ) ) {
             return false;
         }
     }
@@ -154,22 +173,122 @@ function fbpro_popup_active_here( $btn ) {
     $current = rtrim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
 
     foreach ( array_filter( array_map( 'trim', explode( "\n", $rules ) ) ) as $rule ) {
-        $rule = rtrim( $rule, '/' );
-
-        if ( stripos( $rule, 'posttype:' ) === 0 ) {
-            $pt = trim( substr( $rule, 9 ) );
-            if ( ! empty( $pt ) && ( is_singular( $pt ) || is_post_type_archive( $pt ) ) ) {
-                return true;
-            }
-            continue;
-        }
-
-        if ( $current === $rule || '/' . ltrim( $current, '/' ) === '/' . ltrim( $rule, '/' ) ) {
+        if ( fbpro_rule_matches_current( $rule, $current ) ) {
             return true;
         }
     }
 
     return false;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SCOPER CSS DE POPUP
+   Capa 1 — @scope nativo (Chrome 118+, Safari 17.4+, Firefox 128+)
+   Capa 2 — fallback con prefijado de selectores para navegadores
+             que no soporten @scope.
+   El output es un bloque @scope seguido del fallback prefijado;
+   los navegadores modernos usarán @scope y los antiguos el fallback.
+   ═══════════════════════════════════════════════════════════════ */
+function fbpro_scope_popup_css( $raw_css, $popup_id ) {
+    if ( empty( trim( $raw_css ) ) ) return '';
+
+    // — Sanitizar —
+    $css = preg_replace( '#</style\s*>#i', '', $raw_css );
+    $css = preg_replace( '/@import\b[^;]*;/i', '', $css );
+    $css = str_ireplace( [ 'javascript:', 'expression(', 'behavior:' ], [ '', '', '' ], $css );
+    $css = preg_replace( '#/\*.*?\*/#s', '', $css ); // strip comments
+
+    $selector = '#fbpro-popup-' . $popup_id;
+
+    // ── Capa 1: @scope ──────────────────────────────────────────
+    // Envuelve el CSS sin tocar selectores; el navegador se encarga
+    // de aplicarlo solo dentro de $selector.
+    $scoped_block = "@scope ({$selector}) {\n{$css}\n}";
+
+    // ── Capa 2: fallback con prefijado de selectores ─────────────
+    $prefix = $selector;
+
+    $scope_sel = function ( $raw_sel ) use ( $prefix ) {
+        $out = [];
+        foreach ( explode( ',', $raw_sel ) as $sel ) {
+            $sel = trim( $sel );
+            if ( $sel === '' ) continue;
+            if ( preg_match( '/^(#fbpro-popup|\.fbpro-popup|html\b|body\b|:root\b)/i', $sel ) ) {
+                $out[] = $sel;
+            } else {
+                $out[] = $prefix . ' ' . $sel;
+            }
+        }
+        return implode( ', ', $out );
+    };
+
+    $fallback = '';
+    $pos      = 0;
+    $len      = strlen( $css );
+
+    while ( $pos < $len ) {
+        if ( $css[ $pos ] <= ' ' ) { $pos++; continue; }
+
+        if ( $css[ $pos ] === '@' ) {
+            $start = $pos;
+            while ( $pos < $len && $css[ $pos ] !== '{' && $css[ $pos ] !== ';' ) { $pos++; }
+            if ( $pos >= $len ) break;
+
+            if ( $css[ $pos ] === ';' ) { $pos++; continue; } // @import already stripped
+
+            $header = substr( $css, $start, $pos - $start );
+            $pos++; // past {
+
+            $inner = '';
+            $depth = 1;
+            while ( $pos < $len && $depth > 0 ) {
+                $ch = $css[ $pos++ ];
+                if ( $ch === '{' )      { $depth++; $inner .= $ch; }
+                elseif ( $ch === '}' )  { $depth--; if ( $depth > 0 ) $inner .= $ch; }
+                else                    { $inner .= $ch; }
+            }
+
+            if ( preg_match( '/@(media|supports|layer|document)\b/i', $header ) ) {
+                $scoped_inner = preg_replace_callback(
+                    '/([^{@][^{]*)\{([^}]*)\}/s',
+                    function ( $m ) use ( $scope_sel ) {
+                        $s = $scope_sel( $m[1] );
+                        return $s ? $s . '{' . $m[2] . '}' : '';
+                    },
+                    $inner
+                );
+                $fallback .= $header . '{' . $scoped_inner . "}\n";
+            } else {
+                $fallback .= $header . '{' . $inner . "}\n"; // @keyframes, @font-face, etc.
+            }
+            continue;
+        }
+
+        $sel_start = $pos;
+        while ( $pos < $len && $css[ $pos ] !== '{' ) { $pos++; }
+        $rule_selector = substr( $css, $sel_start, $pos - $sel_start );
+        if ( $pos >= $len ) break;
+        $pos++;
+
+        $props = '';
+        $depth = 1;
+        while ( $pos < $len && $depth > 0 ) {
+            $ch = $css[ $pos++ ];
+            if ( $ch === '{' )      { $depth++; $props .= $ch; }
+            elseif ( $ch === '}' )  { $depth--; if ( $depth > 0 ) $props .= $ch; }
+            else                    { $props .= $ch; }
+        }
+
+        $scoped = $scope_sel( $rule_selector );
+        if ( $scoped !== '' ) {
+            $fallback .= $scoped . '{' . $props . "}\n";
+        }
+    }
+
+    // Navegadores modernos ejecutan @scope e ignoran el fallback
+    // (la especificidad de @scope gana). Navegadores sin @scope
+    // ignoran el bloque @scope desconocido y usan el fallback.
+    return $scoped_block . "\n" . $fallback;
 }
 
 /* ═══════════════════════════════════════════════════════════════
