@@ -79,6 +79,9 @@
       var wrapper = bubble.closest('.fbpro-btn-wrapper');
       if (!wrapper) return;
 
+      // Limpiar alineación previa para que el resize recalcule desde cero
+      bubble.classList.remove('fbpro-bubble--align-left', 'fbpro-bubble--align-right');
+
       var wrapperRect = wrapper.getBoundingClientRect();
       var vw     = window.innerWidth;
       var vh     = window.innerHeight;
@@ -138,10 +141,26 @@
         bubble.classList.remove('fbpro-bubble--' + currentPos);
         bubble.classList.add('fbpro-bubble--' + newPos);
       }
+
+      // ── Alineación automática para top/bottom según borde del viewport ──
+      var finalPos = newPos;
+      if (finalPos === 'top' || finalPos === 'bottom') {
+        var wrapperCenter   = wrapperRect.left + wrapperRect.width / 2;
+        var halfBubble      = bubbleW / 2;
+        var edgeMargin      = 10;
+        var overflowsLeft   = wrapperCenter < halfBubble + edgeMargin;
+        var overflowsRight  = (vw - wrapperCenter) < halfBubble + edgeMargin;
+
+        if (overflowsRight) {
+          bubble.classList.add('fbpro-bubble--align-right');
+        } else if (overflowsLeft) {
+          bubble.classList.add('fbpro-bubble--align-left');
+        }
+      }
     }
 
     function closeBubble(bubble, userClosed) {
-      bubble.classList.remove('is-visible');
+      bubble.classList.remove('is-visible', 'fbpro-bubble--align-left', 'fbpro-bubble--align-right');
       setTimeout(function () { bubble.style.display = 'none'; }, 300);
       if (userClosed && bubble.dataset.rememberClose === '1') {
         sessionStorage.setItem('fbpro_bubble_closed_' + bubble.dataset.bubbleId, '1');

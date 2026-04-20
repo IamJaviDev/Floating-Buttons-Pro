@@ -255,6 +255,20 @@
   transform: translateX(-50%);
 }
 
+/* ── Alineación automática para top/bottom según borde del viewport ── */
+.fbpro-bubble--top.fbpro-bubble--align-right,
+.fbpro-bubble--bottom.fbpro-bubble--align-right {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+.fbpro-bubble--top.fbpro-bubble--align-left,
+.fbpro-bubble--bottom.fbpro-bubble--align-left {
+  left: 0;
+  right: auto;
+  transform: none;
+}
+
 /* ── Contenido ── */
 .fbpro-bubble__title {
   font-weight: 600;
@@ -316,6 +330,21 @@
   margin-left: -5px;
   border-bottom: none;
   border-right: none;
+}
+
+/* Flecha anclada al lado derecho del bubble */
+.fbpro-bubble--top.fbpro-bubble--align-right .fbpro-bubble__arrow,
+.fbpro-bubble--bottom.fbpro-bubble--align-right .fbpro-bubble__arrow {
+  left: auto;
+  right: 20px;
+  margin-left: 0;
+}
+
+/* Flecha anclada al lado izquierdo del bubble */
+.fbpro-bubble--top.fbpro-bubble--align-left .fbpro-bubble__arrow,
+.fbpro-bubble--bottom.fbpro-bubble--align-left .fbpro-bubble__arrow {
+  left: 20px;
+  margin-left: 0;
 }
 
 /* ── Animaciones ── */
