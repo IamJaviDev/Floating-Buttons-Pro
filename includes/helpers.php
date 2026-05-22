@@ -39,6 +39,7 @@ function fbpro_button_defaults() {
         'popup_content'  => '',
         'popup_css'      => '',
         'popup_pages'    => '',
+        'trigger_slug'   => '',
         // Visibilidad
         'hide_mobile'    => false,
         'hide_desktop'   => false,
@@ -72,6 +73,15 @@ function fbpro_button_defaults() {
             'max_width'        => 240,
             'shadow'           => '2',
             'animation'        => 'fade',
+        ],
+        // Triggers de apertura automática del popup
+        'popup_trigger' => [
+            'enabled'          => false,
+            'on_time'          => false,
+            'time_delay'       => 10,
+            'on_scroll'        => false,
+            'scroll_percent'   => 50,
+            'once_per_session' => true,
         ],
     ];
 }
@@ -195,14 +205,30 @@ function fbpro_button_visible( $btn ) {
 
     $current = rtrim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
 
-    // Popup buttons: popup_pages controls where the button (and popup) appears
+    // Popup buttons: popup_pages como whitelist, luego hide_on como blacklist
     if ( ( $btn['action_type'] ?? 'link' ) === 'popup' ) {
-        $rules = trim( $btn['popup_pages'] ?? '' );
-        if ( empty( $rules ) ) return true;
-        foreach ( array_filter( array_map( 'trim', explode( "\n", $rules ) ) ) as $rule ) {
-            if ( fbpro_rule_matches_current( $rule, $current ) ) return true;
+        // 1. Whitelist de páginas donde aparece el botón
+        $pages = trim( $btn['popup_pages'] ?? '' );
+        if ( ! empty( $pages ) ) {
+            $in_whitelist = false;
+            foreach ( array_filter( array_map( 'trim', explode( "\n", $pages ) ) ) as $rule ) {
+                if ( fbpro_rule_matches_current( $rule, $current ) ) {
+                    $in_whitelist = true;
+                    break;
+                }
+            }
+            if ( ! $in_whitelist ) return false;
         }
-        return false;
+
+        // 2. Blacklist de URLs donde se oculta el botón
+        $hide = trim( $btn['hide_on'] ?? '' );
+        if ( ! empty( $hide ) ) {
+            foreach ( array_filter( array_map( 'trim', explode( "\n", $hide ) ) ) as $rule ) {
+                if ( fbpro_rule_matches_current( $rule, $current ) ) return false;
+            }
+        }
+
+        return true;
     }
 
     // Link buttons: hide_on exclusion list
@@ -385,6 +411,18 @@ function fbpro_sanitize_bubble( $raw ) {
     ];
 }
 
+function fbpro_sanitize_popup_trigger( $raw ) {
+    if ( ! is_array( $raw ) ) $raw = [];
+    return [
+        'enabled'          => ! empty( $raw['enabled'] ),
+        'on_time'          => ! empty( $raw['on_time'] ),
+        'time_delay'       => max( 1, min( 120, absint( $raw['time_delay'] ?? 10 ) ) ),
+        'on_scroll'        => ! empty( $raw['on_scroll'] ),
+        'scroll_percent'   => max( 5, min( 95, absint( $raw['scroll_percent'] ?? 50 ) ) ),
+        'once_per_session' => isset( $raw['once_per_session'] ) ? ! empty( $raw['once_per_session'] ) : true,
+    ];
+}
+
 function fbpro_sanitize_css_class( $value ) {
     if ( empty( $value ) ) return '';
     $classes = preg_split( '/\s+/', trim( $value ) );
@@ -418,13 +456,16 @@ function fbpro_sanitize_button( $raw ) {
     if ( ! is_array( $raw ) ) return [];
     $svgs = array_keys( fbpro_icon_library() );
 
+    $action_type = in_array( $raw['action_type'] ?? '', [ 'link', 'popup' ] ) ? $raw['action_type'] : 'link';
+    $popup_mode  = in_array( $raw['popup_mode'] ?? '', [ 'shortcode', 'html' ] ) ? $raw['popup_mode'] : 'shortcode';
+
     return [
         'id'             => sanitize_text_field( $raw['id'] ?? '' ),
         'active'         => ! empty( $raw['active'] ),
         'order'          => absint( $raw['order'] ?? 0 ),
         'label'          => sanitize_text_field( $raw['label'] ?? 'Nuevo botón' ),
 
-        'action_type'    => in_array( $raw['action_type'] ?? '', [ 'link', 'popup' ] ) ? $raw['action_type'] : 'link',
+        'action_type'    => $action_type,
         'url'            => esc_url_raw( $raw['url'] ?? '' ),
         'target'         => in_array( $raw['target'] ?? '', [ '_self', '_blank' ] ) ? $raw['target'] : '_blank',
         'tooltip'        => sanitize_text_field( $raw['tooltip'] ?? '' ),
@@ -448,8 +489,8 @@ function fbpro_sanitize_button( $raw ) {
 
         'hover_effect'   => in_array( $raw['hover_effect'] ?? '', [ 'scale', 'pulse', 'brightness', 'none' ] ) ? $raw['hover_effect'] : 'scale',
 
-        'popup_mode'     => in_array( $raw['popup_mode'] ?? '', [ 'shortcode', 'html' ] ) ? $raw['popup_mode'] : 'shortcode',
-        'popup_content'  => wp_kses_post( $raw['popup_content'] ?? '' ),
+        'popup_mode'     => $popup_mode,
+        'popup_content'  => $popup_mode === 'html' ? ( $raw['popup_content'] ?? '' ) : wp_kses_post( $raw['popup_content'] ?? '' ),
         'popup_css'      => sanitize_textarea_field( $raw['popup_css'] ?? '' ),
         'popup_pages'    => sanitize_textarea_field( $raw['popup_pages'] ?? '' ),
 
@@ -463,6 +504,8 @@ function fbpro_sanitize_button( $raw ) {
         'schedule_to'      => fbpro_sanitize_time( $raw['schedule_to']   ?? '20:00' ),
 
         'bubble'           => fbpro_sanitize_bubble( $raw['bubble'] ?? [] ),
+        'popup_trigger'    => fbpro_sanitize_popup_trigger( $raw['popup_trigger'] ?? [] ),
+        'trigger_slug'     => $action_type === 'popup' ? sanitize_title( $raw['trigger_slug'] ?? '' ) : '',
     ];
 }
 

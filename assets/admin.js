@@ -8,11 +8,13 @@
     editingId: null,
     activeMTab: 'contenido',
     cmEditor: null,
+    pendingImport: null,
 
     /* ── Init ──────────────────────────────────────────────── */
     init: function () {
       this.buttons = (window.fbproData && fbproData.buttons) ? fbproData.buttons : [];
       this.renderList();
+      this.renderExportList();
       this.bindEvents();
       if (window.fbproData && fbproData.setupPending) {
         $('#fbpro-setup-banner').show();
@@ -171,6 +173,134 @@
       this.editingId = null;
     },
 
+    /* ── Lista de exportación ──────────────────────────────────── */
+    renderExportList: function () {
+      var self = this;
+      var $wrap = $('#fbpro-export-wrap');
+      if (!$wrap.length) return;
+
+      var sorted = this.buttons.slice().sort(function (a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+
+      var html = '';
+
+      if (sorted.length === 0) {
+        html = '<p class="fbpro-help">No hay botones para exportar.</p>';
+        $wrap.html(html);
+        return;
+      }
+
+      html += '<div class="fbpro-export-list" id="fbpro-export-list">';
+      sorted.forEach(function (btn) {
+        var previewHtml = self.exportPreviewHtml(btn);
+        var meta;
+        if (btn.action_type === 'popup') {
+          meta = '<span class="fbpro-badge fbpro-badge--popup">Popup</span>';
+        } else {
+          meta = '<span class="fbpro-card-url">' + self.escHtml(self.truncate(btn.url || '—', 40)) + '</span>';
+        }
+        html += '<label class="fbpro-export-item">' +
+          '<input type="checkbox" class="fbpro-export-check" value="' + self.escAttr(btn.id) + '" checked>' +
+          previewHtml +
+          '<span class="fbpro-export-item__label">' + self.escHtml(btn.label || 'Sin nombre') + '</span>' +
+          meta +
+          '</label>';
+      });
+      html += '</div>';
+
+      html += '<div style="margin:10px 0 14px">' +
+        '<label class="fbpro-toggle">' +
+          '<input type="checkbox" id="fbpro-export-include-global" checked>' +
+          '<span>Incluir ajustes globales</span>' +
+        '</label>' +
+        '</div>';
+
+      html += '<button type="button" id="fbpro-export-btn" class="fbpro-btn-primary">Exportar seleccionados</button>' +
+        ' <span class="fbpro-save-status" id="fbpro-export-status"></span>';
+
+      $wrap.html(html);
+    },
+
+    exportPreviewHtml: function (btn) {
+      var bg;
+      if (btn.bg_type === 'gradient') {
+        bg = 'linear-gradient(' + (btn.gradient_angle || 135) + 'deg, ' + (btn.gradient_from || '#2A90A0') + ', ' + (btn.gradient_to || '#1a6e7e') + ')';
+      } else {
+        bg = btn.bg_color || '#2A90A0';
+      }
+      var radius = btn.radius !== undefined ? btn.radius : 16;
+      var size   = btn.size || 56;
+      var previewRadius = Math.round(radius * 32 / size);
+      var iconColor = btn.icon_color || '#ffffff';
+      var iconHtml  = this.svgPreviewHtml(btn, iconColor, '55%');
+      var style = [
+        'background:' + bg,
+        'width:32px',
+        'height:32px',
+        'border-radius:' + previewRadius + 'px',
+        'display:inline-flex',
+        'align-items:center',
+        'justify-content:center',
+        'flex-shrink:0',
+        'box-shadow:0 2px 6px rgba(0,0,0,.15)',
+      ].join(';');
+      return '<span style="' + style + '">' + iconHtml + '</span>';
+    },
+
+    /* ── Modal de importación ──────────────────────────────────── */
+    openImportModal: function (parsed) {
+      var self = this;
+      var buttons = parsed.buttons || [];
+      var html = '';
+
+      if (buttons.length === 0) {
+        html += '<p class="fbpro-help">El archivo no contiene botones.</p>';
+      } else {
+        html += '<div class="fbpro-export-list" style="margin-bottom:16px">';
+        buttons.forEach(function (btn) {
+          var previewHtml = self.exportPreviewHtml(btn);
+          var meta;
+          if (btn.action_type === 'popup') {
+            meta = '<span class="fbpro-badge fbpro-badge--popup">Popup</span>';
+          } else {
+            meta = '<span class="fbpro-card-url">' + self.escHtml(self.truncate(btn.url || '—', 40)) + '</span>';
+          }
+          html += '<label class="fbpro-export-item">' +
+            '<input type="checkbox" class="fbpro-import-check" value="' + self.escAttr(btn.id || '') + '" checked>' +
+            previewHtml +
+            '<span class="fbpro-export-item__label">' + self.escHtml(btn.label || 'Sin nombre') + '</span>' +
+            meta +
+            '</label>';
+        });
+        html += '</div>';
+      }
+
+      html += '<div class="fbpro-field">' +
+        '<label class="fbpro-radio" style="margin-bottom:6px">' +
+          '<input type="radio" name="fbpro_import_mode" value="replace" checked> ' +
+          'Reemplazar toda la configuración actual' +
+        '</label>' +
+        '<p class="fbpro-help" style="margin:0 0 14px 22px">Borrará todos los botones actuales y los ajustes globales se sobrescribirán si vienen en el archivo.</p>' +
+        '<label class="fbpro-radio">' +
+          '<input type="radio" name="fbpro_import_mode" value="append"> ' +
+          'Añadir a los botones existentes' +
+        '</label>' +
+        '<p class="fbpro-help" style="margin:2px 0 0 22px">Mantiene los botones actuales y añade los importados al final. Los ajustes globales del archivo se ignorarán.</p>' +
+        '</div>';
+
+      $('#fbpro-import-modal-body').html(html);
+      $('#fbpro-import-modal-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
+      $('#fbpro-import-modal').attr('aria-hidden', 'false').addClass('is-open');
+      $('body').addClass('fbpro-modal-open');
+    },
+
+    closeImportModal: function () {
+      $('#fbpro-import-modal').attr('aria-hidden', 'true').removeClass('is-open');
+      $('body').removeClass('fbpro-modal-open');
+      this.pendingImport = null;
+    },
+
     switchMTab: function (tab) {
       this.activeMTab = tab;
       $('.fbpro-mtab').removeClass('active').filter('[data-mtab="' + tab + '"]').addClass('active');
@@ -197,6 +327,7 @@
     updateActionFields: function () {
       var action = $('input[name="fbpro_action_type"]:checked').val();
       $('#fbpro-url-fields').toggle(action === 'link');
+      $('#fbpro-trigger-slug-wrap').toggle(action === 'popup');
     },
 
     updateIconFields: function () {
@@ -214,12 +345,20 @@
     updateModalForActionType: function () {
       var isPopup = $('input[name="fbpro_action_type"]:checked').val() === 'popup';
       $('[data-mtab="visibilidad"]').toggle(!isPopup);
+      // Sincronizar hide_on entre los dos campos antes de cambiar visibilidad
+      if (isPopup) {
+        $('#fbpro-field-hide-on-popup').val($('#fbpro-field-hide-on-link').val());
+      } else {
+        $('#fbpro-field-hide-on-link').val($('#fbpro-field-hide-on-popup').val());
+      }
       var $dv = $('#fbpro-device-visibility');
       if (isPopup) {
         $('#fbpro-popup-device-slot').append($dv);
       } else {
         $('#fbpro-mp-visibilidad').prepend($dv);
       }
+      $('#fbpro-hide-on-popup-wrap').toggle(isPopup);
+      $('#fbpro-hide-on-link-wrap').toggle(!isPopup);
     },
 
     modalFormHtml: function (btn) {
@@ -274,6 +413,11 @@
       var b    = $.extend({}, bDef, btn.bubble || {});
       var bShadow = (b.shadow !== undefined && b.shadow !== null) ? String(b.shadow) : '2';
 
+      var ptDef = (window.fbproData && fbproData.defaults && fbproData.defaults.popup_trigger) ? fbproData.defaults.popup_trigger : {};
+      var pt    = $.extend({}, ptDef, btn.popup_trigger || {});
+
+      var slugExample = btn.trigger_slug || (isPopup ? this.jsSanitizeTitle(btn.label) : 'mi-popup');
+
       var activeDays  = btn.schedule_days && btn.schedule_days.length ? btn.schedule_days : [1,2,3,4,5,6,7];
       var dayLabels   = ['L','M','X','J','V','S','D'];
       var daysHtml    = dayLabels.map(function (lbl, i) {
@@ -315,6 +459,15 @@
           '<div class="fbpro-field">',
             '<label>Tooltip <small>(texto al pasar el ratón)</small></label>',
             '<input type="text" id="fbpro-field-tooltip" value="' + this.escAttr(btn.tooltip || '') + '" placeholder="Llamar ahora">',
+          '</div>',
+          '<div class="fbpro-field" id="fbpro-trigger-slug-wrap"' + (!isPopup ? ' style="display:none"' : '') + '>',
+            '<label>Identificador para enlaces externos</label>',
+            '<input type="text" id="fbpro-field-trigger-slug" value="' + this.escAttr(btn.trigger_slug || '') + '" placeholder="se autogenerará del nombre">',
+            '<p class="fbpro-help">',
+              'Usa este identificador en cualquier elemento HTML para abrir este popup:<br>',
+              '<code>&lt;a class=&quot;fbpro-open-popup&quot; data-fbpro-target=&quot;<span id="fbpro-trigger-slug-example">' + this.escHtml(slugExample) + '</span>&quot;&gt;Abrir&lt;/a&gt;</code><br>',
+              'Para cerrar desde cualquier sitio: <code>class=&quot;fbpro-close-popup&quot;</code>',
+            '</p>',
           '</div>',
           '<div class="fbpro-field">',
             '<label>Clase CSS <small>(opcional)</small></label>',
@@ -448,19 +601,67 @@
             '</div>',
             '<div class="fbpro-field">',
               '<label>Contenido del popup</label>',
-              '<textarea id="fbpro-field-popup-content" rows="6" placeholder="[contact-form-7 id=&quot;123&quot; title=&quot;Contacto&quot;]">' + this.escHtml(btn.popup_content || '') + '</textarea>',
+              '<textarea id="fbpro-field-popup-content" rows="6" placeholder="Pega aquí el HTML o el shortcode del popup">' + this.escHtml(btn.popup_content || '') + '</textarea>',
+              '<p id="fbpro-popup-script-hint" class="fbpro-help"' + (btn.popup_mode === 'html' ? '' : ' style="display:none"') + '>⚠ Este campo acepta HTML y JavaScript sin filtrar. Pega solo scripts de fuentes confiables (rrforms, Calendly, Typeform, etc.).</p>',
             '</div>',
+            '<div id="fbpro-popup-device-slot"></div>',
             '<div class="fbpro-field">',
               '<label>Mostrar botón solo en estas páginas <small>(vacío = todas)</small></label>',
               '<textarea id="fbpro-field-popup-pages" rows="5" placeholder="/landing/&#10;posttype:ciudades">' + this.escHtml(btn.popup_pages || '') + '</textarea>',
-              '<p class="fbpro-help">Una regla por línea. Vacío = aparece en toda la web.</p>',
+              '<p class="fbpro-help">Una regla por línea. Vacío = aparece en toda la web. Usa el campo de abajo para ocultarlo en URLs concretas.</p>',
+            '</div>',
+            '<div class="fbpro-field" id="fbpro-hide-on-popup-wrap"' + (!isPopup ? ' style="display:none"' : '') + '>',
+              '<label>Ocultar botón en estas páginas</label>',
+              '<textarea id="fbpro-field-hide-on-popup" rows="6" placeholder="/contacto/&#10;/aviso-legal/&#10;posttype:ciudades">' + this.escHtml(btn.hide_on || '') + '</textarea>',
+              '<p class="fbpro-help">Una regla por línea. El botón se ocultará en estas URLs aunque el campo anterior esté vacío.</p>',
             '</div>',
             '<div class="fbpro-field">',
               '<label>CSS personalizado <small>(scoped a este popup)</small></label>',
               '<textarea id="fbpro-field-popup-css" rows="8" class="fbpro-code-editor" placeholder=".mi-formulario { color: red; }&#10;input { border-radius: 6px; }">' + this.escHtml(btn.popup_css || '') + '</textarea>',
               '<p class="fbpro-help">Se aplica únicamente dentro de este popup. No afecta al resto de la web.</p>',
             '</div>',
-            '<div id="fbpro-popup-device-slot"></div>',
+            '<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">',
+            '<p style="font-weight:600;margin:0 0 10px;font-size:13px;color:#374151">Apertura automática</p>',
+            '<div class="fbpro-field">',
+              '<label class="fbpro-toggle">',
+                '<input type="checkbox" id="fbpro-field-pt-enabled"' + (pt.enabled ? ' checked' : '') + '>',
+                '<span>Activar apertura automática</span>',
+              '</label>',
+              '<p class="fbpro-help">Abre el popup automáticamente sin que el usuario pulse el botón.</p>',
+            '</div>',
+            '<div id="fbpro-pt-config"' + (!pt.enabled ? ' style="display:none"' : '') + '>',
+              '<div class="fbpro-field">',
+                '<label class="fbpro-toggle" style="margin-bottom:6px">',
+                  '<input type="checkbox" name="pt_on_time"' + (pt.on_time ? ' checked' : '') + '>',
+                  '<span>Abrir por tiempo</span>',
+                '</label>',
+                '<div class="fbpro-pt-time-seconds"' + (!pt.on_time ? ' style="display:none"' : '') + '>',
+                  '<div style="display:flex;align-items:center;gap:8px;padding-left:8px;margin-top:4px">',
+                    '<input type="number" id="fbpro-field-pt-time-delay" min="1" max="120" value="' + (pt.time_delay !== undefined ? pt.time_delay : 10) + '" style="width:64px">',
+                    '<span style="font-size:13px;color:#6b7280">segundos tras cargar la página</span>',
+                  '</div>',
+                '</div>',
+              '</div>',
+              '<div class="fbpro-field">',
+                '<label class="fbpro-toggle" style="margin-bottom:6px">',
+                  '<input type="checkbox" name="pt_on_scroll"' + (pt.on_scroll ? ' checked' : '') + '>',
+                  '<span>Abrir por scroll</span>',
+                '</label>',
+                '<div class="fbpro-pt-scroll-percent"' + (!pt.on_scroll ? ' style="display:none"' : '') + '>',
+                  '<div style="display:flex;align-items:center;gap:8px;padding-left:8px;margin-top:4px">',
+                    '<input type="number" id="fbpro-field-pt-scroll-percent" min="5" max="95" value="' + (pt.scroll_percent !== undefined ? pt.scroll_percent : 50) + '" style="width:64px">',
+                    '<span style="font-size:13px;color:#6b7280">% de la página scrolleada</span>',
+                  '</div>',
+                '</div>',
+              '</div>',
+              '<div class="fbpro-field" style="margin-top:8px">',
+                '<label class="fbpro-toggle">',
+                  '<input type="checkbox" id="fbpro-field-pt-once"' + (pt.once_per_session !== false ? ' checked' : '') + '>',
+                  '<span>Mostrar solo una vez por sesión</span>',
+                '</label>',
+                '<p class="fbpro-help" style="margin-top:4px">Si está activado, una vez mostrado el popup automáticamente, no volverá a abrirse hasta que el usuario cierre y vuelva a abrir el navegador. El botón sigue funcionando con clic manual.</p>',
+              '</div>',
+            '</div>',
           '</div>',
         '</div>',
 
@@ -628,9 +829,9 @@
               '</label>',
             '</div>',
           '</div>',
-          '<div class="fbpro-field" style="margin-top:16px">',
+          '<div class="fbpro-field" id="fbpro-hide-on-link-wrap" style="margin-top:16px' + (isPopup ? ';display:none' : '') + '">',
             '<label>Ocultar este botón en estas URLs</label>',
-            '<textarea id="fbpro-field-hide-on" rows="6" placeholder="/contacto/&#10;/aviso-legal/&#10;posttype:ciudades">' + this.escHtml(btn.hide_on || '') + '</textarea>',
+            '<textarea id="fbpro-field-hide-on-link" rows="6" placeholder="/contacto/&#10;/aviso-legal/&#10;posttype:ciudades">' + this.escHtml(btn.hide_on || '') + '</textarea>',
             '<div class="fbpro-help-block">',
               'Una regla por línea:<br>',
               '<code>/contacto/</code> → oculta en esa URL &nbsp;·&nbsp; <code>posttype:ciudades</code> → oculta en ese CPT',
@@ -703,13 +904,16 @@
         radius:         parseInt($('#fbpro-field-radius').val() || 16, 10),
         shadow:         parseInt($('#fbpro-field-shadow').val() || 2, 10),
         hover_effect:   $('input[name="fbpro_hover"]:checked').val() || 'scale',
+        trigger_slug:   $('#fbpro-field-trigger-slug').val() || '',
         popup_mode:     $('#fbpro-field-popup-mode').val() || 'shortcode',
         popup_content:  $('#fbpro-field-popup-content').val(),
         popup_css:      this.cmEditor ? this.cmEditor.codemirror.getValue() : ($('#fbpro-field-popup-css').val() || ''),
         popup_pages:    $('#fbpro-field-popup-pages').val(),
         hide_mobile:    $('#fbpro-field-hide-mobile').prop('checked'),
         hide_desktop:   $('#fbpro-field-hide-desktop').prop('checked'),
-        hide_on:        $('#fbpro-field-hide-on').val(),
+        hide_on:        ($('input[name="fbpro_action_type"]:checked').val() === 'popup')
+                          ? $('#fbpro-field-hide-on-popup').val()
+                          : $('#fbpro-field-hide-on-link').val(),
         schedule_enabled: $('#fbpro-field-schedule-enabled').prop('checked'),
         schedule_days:    (function () {
           var days = [];
@@ -747,6 +951,14 @@
           max_width:        parseInt($('[name="bubble_max_width"]').val() || 240, 10),
           shadow:           $('[name="bubble_shadow"]').val() || '2',
         },
+        popup_trigger: {
+          enabled:          $('#fbpro-field-pt-enabled').prop('checked'),
+          on_time:          $('[name="pt_on_time"]').prop('checked'),
+          time_delay:       parseInt($('#fbpro-field-pt-time-delay').val() || 10, 10),
+          on_scroll:        $('[name="pt_on_scroll"]').prop('checked'),
+          scroll_percent:   parseInt($('#fbpro-field-pt-scroll-percent').val() || 50, 10),
+          once_per_session: $('#fbpro-field-pt-once').prop('checked'),
+        },
       };
     },
 
@@ -763,6 +975,9 @@
         $(this).addClass('active');
         $('.fbpro-tab-panel').removeClass('active');
         $('#tab-' + tab).addClass('active');
+        if (tab === 'tools') {
+          self.renderExportList();
+        }
       });
 
       /* ── Añadir botón ─────────────────────────────────────── */
@@ -823,7 +1038,8 @@
         $btn.prop('disabled', true).text('Guardando…');
         $('#fbpro-modal-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
 
-        var data = self.collectModalData();
+        var data     = self.collectModalData();
+        var sentSlug = data.trigger_slug || '';
 
         $.post(fbproData.ajaxUrl, {
           action: 'fbpro_save_button',
@@ -834,7 +1050,14 @@
           if (r.success) {
             self.upsertButton(r.data.button);
             self.renderList();
-            self.closeModal();
+            var finalSlug = r.data.button.trigger_slug || '';
+            if (r.data.button.action_type === 'popup' && finalSlug !== sentSlug) {
+              $('#fbpro-field-trigger-slug').val(finalSlug);
+              $('#fbpro-modal-status').text('Identificador asignado: ' + finalSlug).addClass('fbpro-status--ok');
+              setTimeout(function () { self.closeModal(); }, 1500);
+            } else {
+              self.closeModal();
+            }
           } else {
             $('#fbpro-modal-status').text('Error: ' + (r.data && r.data.message ? r.data.message : 'desconocido')).addClass('fbpro-status--err');
           }
@@ -963,17 +1186,31 @@
       });
 
       /* ── Exportar configuración ──────────────────────────────── */
-      $('#fbpro-export-btn').on('click', function () {
-        var $btn    = $(this).prop('disabled', true).text('Exportando…');
+      $(document).on('click', '#fbpro-export-btn', function () {
+        var ids = [];
+        $('#fbpro-export-list .fbpro-export-check:checked').each(function () {
+          ids.push($(this).val());
+        });
+
         var $status = $('#fbpro-export-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
 
+        if (ids.length === 0) {
+          $status.text('Selecciona al menos un botón.').addClass('fbpro-status--err');
+          return;
+        }
+
+        var includeGlobal = $('#fbpro-export-include-global').prop('checked') ? '1' : '0';
+        var $btn = $(this).prop('disabled', true).text('Exportando…');
+
         $.post(fbproData.ajaxUrl, {
-          action: 'fbpro_export_config',
-          nonce:  fbproData.nonce,
+          action:         'fbpro_export_config',
+          nonce:          fbproData.nonce,
+          ids:            JSON.stringify(ids),
+          include_global: includeGlobal,
         })
         .done(function (r) {
           if (!r.success) {
-            $status.text('Error al exportar').addClass('fbpro-status--err');
+            $status.text('Error: ' + (r.data && r.data.message ? r.data.message : 'desconocido')).addClass('fbpro-status--err');
             return;
           }
           var blob = new Blob([JSON.stringify(r.data, null, 2)], { type: 'application/json' });
@@ -987,15 +1224,21 @@
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
           $status.text('✓ Descargado').addClass('fbpro-status--ok');
-          setTimeout(function () { $status.text(''); }, 3000);
+          setTimeout(function () { $status.text('').removeClass('fbpro-status--ok fbpro-status--err'); }, 3000);
         })
         .fail(function () { $status.text('Error de red').addClass('fbpro-status--err'); })
-        .always(function () { $btn.prop('disabled', false).text('Exportar configuración'); });
+        .always(function () { $btn.prop('disabled', false).text('Exportar seleccionados'); });
+      });
+
+      /* ── Export: habilitar/deshabilitar botón según selección ── */
+      $(document).on('change', '.fbpro-export-check', function () {
+        var anyChecked = $('#fbpro-export-list .fbpro-export-check:checked').length > 0;
+        $('#fbpro-export-btn').prop('disabled', !anyChecked);
       });
 
       /* ── Importar configuración ───────────────────────────────── */
       $('#fbpro-import-btn').on('click', function () {
-        var file = $('#fbpro-import-file')[0].files[0];
+        var file    = $('#fbpro-import-file')[0].files[0];
         var $status = $('#fbpro-import-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
 
         if (!file) {
@@ -1020,33 +1263,72 @@
             return;
           }
 
-          var count = (parsed.buttons || []).length;
-          if (!confirm('Se importarán ' + count + ' botones. La configuración actual se sobrescribirá completamente. ¿Continuar?')) {
-            return;
-          }
-
-          var $btn = $('#fbpro-import-btn').prop('disabled', true).text('Importando…');
-
-          $.post(fbproData.ajaxUrl, {
-            action: 'fbpro_import_config',
-            nonce:  fbproData.nonce,
-            config: content,
-          })
-          .done(function (r) {
-            if (r.success) {
-              $status.text('✓ ' + r.data.message + ' (' + r.data.buttons_count + ' botones). Recargando…').addClass('fbpro-status--ok');
-              setTimeout(function () { location.reload(); }, 1500);
-            } else {
-              $status.text('Error: ' + (r.data && r.data.message ? r.data.message : 'desconocido')).addClass('fbpro-status--err');
-              $btn.prop('disabled', false).text('Importar');
-            }
-          })
-          .fail(function () {
-            $status.text('Error de red.').addClass('fbpro-status--err');
-            $btn.prop('disabled', false).text('Importar');
-          });
+          self.pendingImport = { content: content, parsed: parsed };
+          self.openImportModal(parsed);
         };
         reader.readAsText(file);
+      });
+
+      /* ── Modal importación: confirmar ─────────────────────────── */
+      $(document).on('click', '#fbpro-import-modal-confirm', function () {
+        if (!self.pendingImport) return;
+
+        var selectedIds = [];
+        $('#fbpro-import-modal-body .fbpro-import-check:checked').each(function () {
+          selectedIds.push($(this).val());
+        });
+
+        var $mstatus = $('#fbpro-import-modal-status').text('').removeClass('fbpro-status--ok fbpro-status--err');
+
+        if (selectedIds.length === 0) {
+          $mstatus.text('Selecciona al menos un botón.').addClass('fbpro-status--err');
+          return;
+        }
+
+        var mode     = $('input[name="fbpro_import_mode"]:checked').val() || 'replace';
+        var $confirm = $(this).prop('disabled', true).text('Importando…');
+
+        $.post(fbproData.ajaxUrl, {
+          action:       'fbpro_import_config',
+          nonce:        fbproData.nonce,
+          config:       self.pendingImport.content,
+          mode:         mode,
+          selected_ids: JSON.stringify(selectedIds),
+        })
+        .done(function (r) {
+          if (r.success) {
+            self.pendingImport = null;
+            $mstatus.text('✓ ' + r.data.message + ' (' + r.data.buttons_count + ' botones). Recargando…').addClass('fbpro-status--ok');
+            setTimeout(function () { location.reload(); }, 1500);
+          } else {
+            self.pendingImport = null;
+            $mstatus.text('Error: ' + (r.data && r.data.message ? r.data.message : 'desconocido')).addClass('fbpro-status--err');
+            $confirm.prop('disabled', false).text('Confirmar importación');
+          }
+        })
+        .fail(function () {
+          self.pendingImport = null;
+          $mstatus.text('Error de red.').addClass('fbpro-status--err');
+          $confirm.prop('disabled', false).text('Confirmar importación');
+        });
+      });
+
+      /* ── Modal importación: cerrar ────────────────────────────── */
+      $(document).on('click', '#fbpro-import-modal-close, #fbpro-import-modal-cancel', function () {
+        self.closeImportModal();
+      });
+
+      $(document).on('click', '#fbpro-import-modal', function (e) {
+        if ($(e.target).is('#fbpro-import-modal')) {
+          self.closeImportModal();
+        }
+      });
+
+      /* ── ESC: cierra el modal de importación ──────────────────── */
+      $(document).on('keydown.fbpro-import', function (e) {
+        if (e.key === 'Escape' && $('#fbpro-import-modal').hasClass('is-open')) {
+          self.closeImportModal();
+        }
       });
 
       /* ── Modal: bubble enabled toggle ───────────────────────────── */
@@ -1074,6 +1356,37 @@
       /* ── Modal: gradient angle preset ────────────────────────── */
       $(document).on('change', '#fbpro-field-gradient-angle-preset', function () {
         $('#fbpro-gradient-angle-custom').toggle($(this).val() === 'custom');
+      });
+
+      /* ── Modal: cambio modo popup ────────────────────────────── */
+      $(document).on('change', '#fbpro-field-popup-mode', function () {
+        $('#fbpro-popup-script-hint').toggle($(this).val() === 'html');
+      });
+
+      /* ── Modal: preview dinámico del trigger_slug ───────────── */
+      $(document).on('input', '#fbpro-field-trigger-slug', function () {
+        var val = $(this).val().trim();
+        $('#fbpro-trigger-slug-example').text(val || self.jsSanitizeTitle($('#fbpro-field-label').val()));
+      });
+
+      $(document).on('input', '#fbpro-field-label', function () {
+        if ($('#fbpro-field-trigger-slug').val().trim() === '') {
+          $('#fbpro-trigger-slug-example').text(self.jsSanitizeTitle($(this).val()));
+        }
+      });
+
+      /* ── Modal: trigger popup enabled toggle ─────────────────── */
+      $(document).on('change', '#fbpro-field-pt-enabled', function () {
+        $(this).closest('.fbpro-mpanel').find('#fbpro-pt-config').toggle(this.checked);
+      });
+
+      /* ── Modal: trigger popup tiempo/scroll sub-toggles ─────── */
+      $(document).on('change', '[name="pt_on_time"]', function () {
+        $(this).closest('.fbpro-field').find('.fbpro-pt-time-seconds').toggle(this.checked);
+      });
+
+      $(document).on('change', '[name="pt_on_scroll"]', function () {
+        $(this).closest('.fbpro-field').find('.fbpro-pt-scroll-percent').toggle(this.checked);
       });
 
       /* ── Color picker ↔ hex input ─────────────────────────────── */
@@ -1118,6 +1431,17 @@
     escAttr: function (str) { return this.escHtml(str); },
     truncate: function (str, len) {
       return str.length > len ? str.slice(0, len) + '…' : str;
+    },
+
+    /* Aproximación a sanitize_title() de PHP para el preview del trigger_slug en admin */
+    jsSanitizeTitle: function (str) {
+      return (str || '')
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/[\s-]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'mi-popup';
     },
   };
 

@@ -50,7 +50,10 @@ function fbpro_render() {
 
     // Renderizar popups
     foreach ( $visible as $btn ) {
-        if ( fbpro_popup_active_here( $btn ) ) {
+        if ( ( $btn['action_type'] ?? 'link' ) !== 'popup' ) continue;
+        // Con trigger_slug: renderizar siempre (el botón ya pasó fbpro_button_visible)
+        // Sin trigger_slug: solo si popup_pages incluye la página actual
+        if ( ! empty( $btn['trigger_slug'] ) || fbpro_popup_active_here( $btn ) ) {
             fbpro_render_popup( $btn );
         }
     }
@@ -156,7 +159,22 @@ function fbpro_render_popup( $btn ) {
         $popup_css_scoped = fbpro_scope_popup_css( $btn['popup_css'], $id );
     }
     ?>
-    <div class="fbpro-overlay" id="fbpro-overlay-<?php echo $id; ?>" aria-hidden="true">
+    <?php
+    $trigger       = $btn['popup_trigger'] ?? [];
+    $trigger_attrs = '';
+    if ( ! empty( $trigger['enabled'] ) && ( ! empty( $trigger['on_time'] ) || ! empty( $trigger['on_scroll'] ) ) ) {
+        $trigger_attrs = sprintf(
+            ' data-trigger-on-time="%s" data-trigger-time-delay="%d" data-trigger-on-scroll="%s" data-trigger-scroll-percent="%d" data-trigger-once="%s"',
+            ! empty( $trigger['on_time'] )          ? '1' : '0',
+            max( 1, min( 120, absint( $trigger['time_delay']       ?? 10 ) ) ),
+            ! empty( $trigger['on_scroll'] )        ? '1' : '0',
+            max( 5, min( 95,  absint( $trigger['scroll_percent']   ?? 50 ) ) ),
+            ! empty( $trigger['once_per_session'] ) ? '1' : '0'
+        );
+    }
+    ?>
+    <?php $slug_attr = ! empty( $btn['trigger_slug'] ) ? ' data-fbpro-slug="' . esc_attr( $btn['trigger_slug'] ) . '"' : ''; ?>
+    <div class="fbpro-overlay" id="fbpro-overlay-<?php echo $id; ?>"<?php echo $slug_attr; ?> aria-hidden="true"<?php echo $trigger_attrs; ?>>
         <div class="fbpro-popup" id="fbpro-popup-<?php echo $id; ?>" role="dialog" aria-modal="true">
             <?php if ( $popup_css_scoped ) : ?>
             <style><?php echo $popup_css_scoped; ?></style>
@@ -171,7 +189,9 @@ function fbpro_render_popup( $btn ) {
                 if ( $mode === 'shortcode' && ! empty( $content ) ) {
                     echo do_shortcode( wp_kses_post( $content ) );
                 } elseif ( $mode === 'html' && ! empty( $content ) ) {
-                    echo wp_kses_post( $content );
+                    // Intencional: no se filtra el HTML en modo 'html'. La seguridad la garantiza
+                    // la verificación de manage_options en fbpro_verify_nonce() al guardar el botón.
+                    echo $content;
                 } else {
                     echo '<p style="color:#999;text-align:center;">Configura el contenido del popup en <strong>Ajustes → Floating Buttons Pro</strong>.</p>';
                 }

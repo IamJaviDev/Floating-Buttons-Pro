@@ -74,6 +74,33 @@
       }
     });
 
+    /* ── Disparadores externos de popup ─────────────────────────── */
+    // Los slugs están sanitizados ([a-z0-9-]) por el backend; no requieren escaping adicional en selectores.
+    document.addEventListener('click', function (e) {
+      var trigger = e.target.closest('.fbpro-open-popup');
+      if (!trigger) return;
+      e.preventDefault();
+      var slug = trigger.getAttribute('data-fbpro-target');
+      if (!slug) {
+        console.warn('[fbpro] Elemento .fbpro-open-popup sin atributo data-fbpro-target');
+        return;
+      }
+      var overlay = document.querySelector('.fbpro-overlay[data-fbpro-slug="' + slug + '"]');
+      if (!overlay) {
+        console.warn('[fbpro] No se encontró ningún popup con slug "' + slug + '". ¿Está el botón activo y configurado para esta página?');
+        return;
+      }
+      openPopup(overlay);
+    });
+
+    document.addEventListener('click', function (e) {
+      var trigger = e.target.closest('.fbpro-close-popup');
+      if (!trigger) return;
+      e.preventDefault();
+      var openOverlay = document.querySelector('.fbpro-overlay.is-open');
+      if (openOverlay) closePopup(openOverlay);
+    });
+
     /* ── Bocadillos ──────────────────────────────────────────── */
     function adjustBubblePosition(bubble) {
       var wrapper = bubble.closest('.fbpro-btn-wrapper');
@@ -211,6 +238,86 @@
         });
       }
     });
+
+    /* ── Triggers automáticos de popup ─────────────────────────── */
+    (function () {
+      var pending = document.querySelectorAll(
+        '.fbpro-overlay[data-trigger-on-time], .fbpro-overlay[data-trigger-on-scroll]'
+      );
+      if (!pending.length) return;
+
+      var scrollPending = [];
+      var rafPending    = false;
+
+      function fireTrigger(overlay) {
+        var btnId = overlay.id.replace('fbpro-overlay-', '');
+        var once  = overlay.dataset.triggerOnce === '1';
+
+        if (overlay._fbproTimerId) {
+          clearTimeout(overlay._fbproTimerId);
+          overlay._fbproTimerId = null;
+        }
+
+        for (var i = scrollPending.length - 1; i >= 0; i--) {
+          if (scrollPending[i].overlay === overlay) {
+            scrollPending.splice(i, 1);
+            break;
+          }
+        }
+
+        if (!scrollPending.length) {
+          window.removeEventListener('scroll', onScrollHandler);
+        }
+
+        if (once) {
+          sessionStorage.setItem('fbpro_popup_shown_' + btnId, '1');
+        }
+
+        openPopup(overlay);
+      }
+
+      function onScrollHandler() {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(function () {
+          rafPending = false;
+          var docH    = document.documentElement.scrollHeight;
+          var viewH   = window.innerHeight;
+          var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+          if (!docH) return;
+
+          for (var i = scrollPending.length - 1; i >= 0; i--) {
+            var item = scrollPending[i];
+            if ((scrollY + viewH) / docH >= item.scrollPercent / 100) {
+              fireTrigger(item.overlay);
+            }
+          }
+        });
+      }
+
+      pending.forEach(function (overlay) {
+        var btnId            = overlay.id.replace('fbpro-overlay-', '');
+        var hasTimeTrigger   = overlay.dataset.triggerOnTime   === '1';
+        var timeDelay        = parseInt(overlay.dataset.triggerTimeDelay, 10) || 10;
+        var hasScrollTrigger = overlay.dataset.triggerOnScroll === '1';
+        var scrollPct        = parseInt(overlay.dataset.triggerScrollPercent, 10) || 50;
+        var once             = overlay.dataset.triggerOnce     === '1';
+
+        if (once && sessionStorage.getItem('fbpro_popup_shown_' + btnId)) return;
+
+        if (hasTimeTrigger) {
+          overlay._fbproTimerId = setTimeout(function () { fireTrigger(overlay); }, timeDelay * 1000);
+        }
+
+        if (hasScrollTrigger) {
+          scrollPending.push({ overlay: overlay, scrollPercent: scrollPct });
+        }
+      });
+
+      if (scrollPending.length) {
+        window.addEventListener('scroll', onScrollHandler, { passive: true });
+      }
+    }());
 
     window.addEventListener('resize', function () {
       document.querySelectorAll('.fbpro-bubble.is-visible').forEach(adjustBubblePosition);

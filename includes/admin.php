@@ -206,9 +206,10 @@ function fbpro_admin_page() {
 
                 <div class="fbpro-tools-section">
                     <h3 class="fbpro-tools-heading">Exportar</h3>
-                    <p class="fbpro-tools-desc">Descarga toda tu configuración (botones y ajustes globales) como JSON para usarla en otra web.</p>
-                    <button type="button" id="fbpro-export-btn" class="fbpro-btn-primary">Exportar configuración</button>
-                    <span class="fbpro-save-status" id="fbpro-export-status" style="margin-left:10px"></span>
+                    <p class="fbpro-tools-desc">Selecciona los botones y ajustes que deseas exportar como JSON para usarlos en otra web.</p>
+                    <div id="fbpro-export-wrap">
+                        <!-- JS renderiza la lista de botones, controles y botón -->
+                    </div>
                 </div>
 
                 <hr class="fbpro-tools-divider">
@@ -257,6 +258,24 @@ function fbpro_admin_page() {
             </div>
         </div>
     </div>
+
+    <!-- ══ MODAL IMPORTACIÓN ══ -->
+    <div class="fbpro-modal-overlay" id="fbpro-import-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="fbpro-import-modal-title">
+        <div class="fbpro-modal">
+            <div class="fbpro-modal-header">
+                <h2 id="fbpro-import-modal-title">Importar configuración</h2>
+                <button class="fbpro-modal-close" id="fbpro-import-modal-close" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="fbpro-modal-body" id="fbpro-import-modal-body">
+                <!-- JS puebla el contenido -->
+            </div>
+            <div class="fbpro-modal-footer">
+                <span class="fbpro-save-status" id="fbpro-import-modal-status"></span>
+                <button type="button" class="fbpro-btn-secondary" id="fbpro-import-modal-cancel">Cancelar</button>
+                <button type="button" class="fbpro-btn-primary" id="fbpro-import-modal-confirm">Confirmar importación</button>
+            </div>
+        </div>
+    </div>
     <?php
 }
 
@@ -282,7 +301,41 @@ function fbpro_ajax_save_button() {
     $raw = json_decode( stripslashes( $_POST['button'] ?? '{}' ), true );
     if ( ! is_array( $raw ) ) wp_send_json_error( [ 'message' => 'Datos inválidos' ] );
 
-    $btn     = fbpro_sanitize_button( $raw );
+    $raw_slug = trim( $raw['trigger_slug'] ?? '' );
+    $btn      = fbpro_sanitize_button( $raw );
+
+    // Validar y resolver trigger_slug para botones popup
+    if ( $btn['action_type'] === 'popup' ) {
+        // Si el slug queda vacío tras sanitizar, autogenerar desde el label
+        if ( empty( $btn['trigger_slug'] ) ) {
+            $btn['trigger_slug'] = sanitize_title( $btn['label'] );
+        }
+
+        // Recoger slugs de todos los demás botones (excluir el propio si tiene id)
+        $existing_slugs = [];
+        foreach ( fbpro_get_buttons() as $other ) {
+            if ( ! empty( $btn['id'] ) && $other['id'] === $btn['id'] ) continue;
+            if ( ! empty( $other['trigger_slug'] ) ) {
+                $existing_slugs[] = $other['trigger_slug'];
+            }
+        }
+
+        if ( in_array( $btn['trigger_slug'], $existing_slugs, true ) ) {
+            if ( $raw_slug !== '' ) {
+                // Slug manual con colisión → error al usuario
+                wp_send_json_error( [ 'message' => 'Ya existe otro botón con el identificador "' . esc_html( $btn['trigger_slug'] ) . '". Cambia el identificador o déjalo vacío para autogenerarlo.' ] );
+            } else {
+                // Slug autogenerado con colisión → añadir sufijo numérico
+                $base   = $btn['trigger_slug'];
+                $suffix = 2;
+                do {
+                    $candidate = $base . '-' . $suffix++;
+                } while ( in_array( $candidate, $existing_slugs, true ) );
+                $btn['trigger_slug'] = $candidate;
+            }
+        }
+    }
+
     $buttons = fbpro_get_buttons();
 
     // ¿Nuevo o actualizar existente?
@@ -520,14 +573,49 @@ add_action( 'wp_ajax_fbpro_export_config', 'fbpro_ajax_export_config' );
 function fbpro_ajax_export_config() {
     fbpro_verify_nonce();
 
-    wp_send_json_success( [
+    $raw_ids = isset( $_POST['ids'] ) ? wp_unslash( $_POST['ids'] ) : null;
+
+    // Compatibilidad hacia atrás: si no llegan parámetros, exportar todo
+    if ( $raw_ids === null ) {
+        wp_send_json_success( [
+            'plugin'      => 'floating-buttons-pro',
+            'version'     => FBPRO_VERSION,
+            'exported_at' => current_time( 'mysql' ),
+            'site_url'    => get_site_url(),
+            'buttons'     => fbpro_get_buttons(),
+            'global'      => fbpro_get_global(),
+        ] );
+    }
+
+    $ids = json_decode( $raw_ids, true );
+    if ( ! is_array( $ids ) ) {
+        wp_send_json_error( [ 'message' => 'Parámetro ids inválido' ] );
+    }
+    if ( empty( $ids ) ) {
+        wp_send_json_error( [ 'message' => 'Selecciona al menos un botón' ] );
+    }
+
+    $ids            = array_map( 'sanitize_text_field', $ids );
+    $include_global = isset( $_POST['include_global'] ) && $_POST['include_global'] === '1';
+
+    $all_buttons = fbpro_get_buttons();
+    $filtered    = array_values( array_filter( $all_buttons, function( $btn ) use ( $ids ) {
+        return in_array( $btn['id'], $ids, true );
+    } ) );
+
+    $response = [
         'plugin'      => 'floating-buttons-pro',
         'version'     => FBPRO_VERSION,
         'exported_at' => current_time( 'mysql' ),
         'site_url'    => get_site_url(),
-        'buttons'     => fbpro_get_buttons(),
-        'global'      => fbpro_get_global(),
-    ] );
+        'buttons'     => $filtered,
+    ];
+
+    if ( $include_global ) {
+        $response['global'] = fbpro_get_global();
+    }
+
+    wp_send_json_success( $response );
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -550,26 +638,67 @@ function fbpro_ajax_import_config() {
         wp_send_json_error( [ 'message' => 'Estructura del JSON incorrecta: falta la clave "buttons"' ] );
     }
 
-    $buttons = fbpro_sanitize_buttons_array( $data['buttons'] );
-    fbpro_save_buttons( $buttons );
-
-    // Importar ajustes globales (soporta clave "global" y también "settings" por compatibilidad)
-    $raw_global = $data['global'] ?? $data['settings'] ?? null;
-    if ( is_array( $raw_global ) ) {
-        $merged = wp_parse_args( $raw_global, fbpro_global_defaults() );
-        fbpro_save_global( [
-            'position_corner' => in_array( $merged['position_corner'] ?? '', [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ] )
-                ? $merged['position_corner'] : 'bottom-right',
-            'offset_x'        => max( 0, min( 200, absint( $merged['offset_x'] ?? 22 ) ) ),
-            'offset_y'        => max( 0, min( 200, absint( $merged['offset_y'] ?? 24 ) ) ),
-            'entrance_anim'   => ! empty( $merged['entrance_anim'] ),
-            'pulse_ring'      => ! empty( $merged['pulse_ring'] ),
-        ] );
+    $mode = sanitize_text_field( $_POST['mode'] ?? 'replace' );
+    if ( ! in_array( $mode, [ 'replace', 'append' ], true ) ) {
+        $mode = 'replace';
     }
 
-    wp_send_json_success( [
-        'message'       => 'Configuración importada correctamente',
-        'buttons_count' => count( $buttons ),
-    ] );
+    $raw_selected = wp_unslash( $_POST['selected_ids'] ?? '' );
+    $selected_ids = json_decode( $raw_selected, true );
+    if ( ! is_array( $selected_ids ) || empty( $selected_ids ) ) {
+        wp_send_json_error( [ 'message' => 'Selecciona al menos un botón' ] );
+    }
+    $selected_ids = array_map( 'sanitize_text_field', $selected_ids );
+
+    // Filtrar los botones del JSON por los IDs seleccionados antes de sanitizar
+    $to_import = array_values( array_filter( $data['buttons'], function( $btn ) use ( $selected_ids ) {
+        return in_array( $btn['id'] ?? '', $selected_ids, true );
+    } ) );
+
+    if ( $mode === 'replace' ) {
+        $buttons = fbpro_sanitize_buttons_array( $to_import );
+        fbpro_save_buttons( $buttons );
+
+        // Importar ajustes globales (soporta clave "global" y también "settings" por compatibilidad)
+        $raw_global = $data['global'] ?? $data['settings'] ?? null;
+        if ( is_array( $raw_global ) ) {
+            $merged = wp_parse_args( $raw_global, fbpro_global_defaults() );
+            fbpro_save_global( [
+                'position_corner' => in_array( $merged['position_corner'] ?? '', [ 'bottom-right', 'bottom-left', 'top-right', 'top-left' ] )
+                    ? $merged['position_corner'] : 'bottom-right',
+                'offset_x'        => max( 0, min( 200, absint( $merged['offset_x'] ?? 22 ) ) ),
+                'offset_y'        => max( 0, min( 200, absint( $merged['offset_y'] ?? 24 ) ) ),
+                'entrance_anim'   => ! empty( $merged['entrance_anim'] ),
+                'pulse_ring'      => ! empty( $merged['pulse_ring'] ),
+            ] );
+        }
+
+        wp_send_json_success( [
+            'message'       => 'Configuración importada correctamente',
+            'buttons_count' => count( $buttons ),
+            'mode'          => $mode,
+        ] );
+
+    } else {
+        // Modo append: cargar existentes, regenerar UIDs, recalcular order y concatenar
+        $existing   = fbpro_get_buttons();
+        $base_order = count( $existing );
+
+        $new_buttons = fbpro_sanitize_buttons_array( $to_import );
+
+        foreach ( $new_buttons as $i => &$btn ) {
+            $btn['id']    = fbpro_generate_uid();
+            $btn['order'] = $base_order + $i;
+        }
+        unset( $btn );
+
+        fbpro_save_buttons( array_merge( $existing, $new_buttons ) );
+
+        wp_send_json_success( [
+            'message'       => 'Botones añadidos correctamente',
+            'buttons_count' => count( $new_buttons ),
+            'mode'          => $mode,
+        ] );
+    }
 }
 
