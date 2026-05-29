@@ -780,6 +780,24 @@ body.fbpro-modal-open { overflow: hidden; }
   flex: 1;
 }
 
+/* ── Fallback row (visible cuando el hex-input contiene var()) ── */
+.fbpro-color-field { display: flex; flex-direction: column; gap: 0; }
+.fbpro-fallback-row {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+}
+.fbpro-fallback-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 5px;
+}
+.fbpro-fallback-label small { font-weight: 400; }
+
 /* ── Gradient fields ─────────────────────────────────────────── */
 .fbpro-gradient-colors {
   display: grid;

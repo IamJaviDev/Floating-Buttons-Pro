@@ -50,9 +50,11 @@
     cardHtml: function (btn) {
       var bg;
       if (btn.bg_type === 'gradient') {
-        bg = 'linear-gradient(' + (btn.gradient_angle || 135) + 'deg, ' + (btn.gradient_from || '#2A90A0') + ', ' + (btn.gradient_to || '#1a6e7e') + ')';
+        var gFrom = /^var\(/.test(btn.gradient_from || '') ? (btn.gradient_from_fallback || '#2A90A0') : (btn.gradient_from || '#2A90A0');
+        var gTo   = /^var\(/.test(btn.gradient_to   || '') ? (btn.gradient_to_fallback   || '#1a6e7e') : (btn.gradient_to   || '#1a6e7e');
+        bg = 'linear-gradient(' + (btn.gradient_angle || 135) + 'deg, ' + gFrom + ', ' + gTo + ')';
       } else {
-        bg = btn.bg_color || '#2A90A0';
+        bg = /^var\(/.test(btn.bg_color || '') ? (btn.bg_color_fallback || '#2A90A0') : (btn.bg_color || '#2A90A0');
       }
       var radius = btn.radius !== undefined ? btn.radius : 16;
       var size   = btn.size   || 56;
@@ -71,7 +73,7 @@
         'box-shadow:0 2px 8px rgba(0,0,0,.18)',
       ].join(';');
 
-      var iconColor = btn.icon_color || '#ffffff';
+      var iconColor = /^var\(/.test(btn.icon_color || '') ? (btn.icon_color_fallback || '#ffffff') : (btn.icon_color || '#ffffff');
       var iconSvgHtml = this.svgPreviewHtml(btn, iconColor, '55%');
 
       var meta = '';
@@ -225,14 +227,16 @@
     exportPreviewHtml: function (btn) {
       var bg;
       if (btn.bg_type === 'gradient') {
-        bg = 'linear-gradient(' + (btn.gradient_angle || 135) + 'deg, ' + (btn.gradient_from || '#2A90A0') + ', ' + (btn.gradient_to || '#1a6e7e') + ')';
+        var gFrom = /^var\(/.test(btn.gradient_from || '') ? (btn.gradient_from_fallback || '#2A90A0') : (btn.gradient_from || '#2A90A0');
+        var gTo   = /^var\(/.test(btn.gradient_to   || '') ? (btn.gradient_to_fallback   || '#1a6e7e') : (btn.gradient_to   || '#1a6e7e');
+        bg = 'linear-gradient(' + (btn.gradient_angle || 135) + 'deg, ' + gFrom + ', ' + gTo + ')';
       } else {
-        bg = btn.bg_color || '#2A90A0';
+        bg = /^var\(/.test(btn.bg_color || '') ? (btn.bg_color_fallback || '#2A90A0') : (btn.bg_color || '#2A90A0');
       }
       var radius = btn.radius !== undefined ? btn.radius : 16;
       var size   = btn.size || 56;
       var previewRadius = Math.round(radius * 32 / size);
-      var iconColor = btn.icon_color || '#ffffff';
+      var iconColor = /^var\(/.test(btn.icon_color || '') ? (btn.icon_color_fallback || '#ffffff') : (btn.icon_color || '#ffffff');
       var iconHtml  = this.svgPreviewHtml(btn, iconColor, '55%');
       var style = [
         'background:' + bg,
@@ -521,26 +525,17 @@
               '<span>Usar degradado</span>',
             '</label>',
             '<div id="fbpro-bg-solid"' + (isGradient ? ' style="display:none"' : '') + '>',
-              '<div class="fbpro-color-row">',
-                '<input type="color" id="fbpro-field-bg-color" value="' + (btn.bg_color || '#2A90A0') + '">',
-                '<input type="text" id="fbpro-field-bg-color-hex" class="fbpro-hex-input" value="' + (btn.bg_color || '#2A90A0').toUpperCase() + '" maxlength="7" placeholder="#2A90A0">',
-              '</div>',
+              self.colorFieldHtml('fbpro-field-bg-color', 'fbpro-field-bg-color-hex', btn.bg_color || '#2A90A0', btn.bg_color_fallback || '#2A90A0', '#2A90A0'),
             '</div>',
             '<div id="fbpro-bg-gradient-fields"' + (!isGradient ? ' style="display:none"' : '') + '>',
               '<div class="fbpro-gradient-colors">',
                 '<div class="fbpro-field">',
                   '<label style="font-weight:500;font-size:12px">Color inicial</label>',
-                  '<div class="fbpro-color-row">',
-                    '<input type="color" id="fbpro-field-gradient-from" value="' + (btn.gradient_from || '#2A90A0') + '">',
-                    '<input type="text" id="fbpro-field-gradient-from-hex" class="fbpro-hex-input" value="' + (btn.gradient_from || '#2A90A0').toUpperCase() + '" maxlength="7">',
-                  '</div>',
+                  self.colorFieldHtml('fbpro-field-gradient-from', 'fbpro-field-gradient-from-hex', btn.gradient_from || '#2A90A0', btn.gradient_from_fallback || '#2A90A0', '#2A90A0'),
                 '</div>',
                 '<div class="fbpro-field">',
                   '<label style="font-weight:500;font-size:12px">Color final</label>',
-                  '<div class="fbpro-color-row">',
-                    '<input type="color" id="fbpro-field-gradient-to" value="' + (btn.gradient_to || '#1a6e7e') + '">',
-                    '<input type="text" id="fbpro-field-gradient-to-hex" class="fbpro-hex-input" value="' + (btn.gradient_to || '#1a6e7e').toUpperCase() + '" maxlength="7">',
-                  '</div>',
+                  self.colorFieldHtml('fbpro-field-gradient-to', 'fbpro-field-gradient-to-hex', btn.gradient_to || '#1a6e7e', btn.gradient_to_fallback || '#1a6e7e', '#1a6e7e'),
                 '</div>',
               '</div>',
               '<div class="fbpro-field">',
@@ -556,10 +551,7 @@
           '<div class="fbpro-grid-2" style="margin-top:4px">',
             '<div class="fbpro-field">',
               '<label>Color del icono</label>',
-              '<div class="fbpro-color-row">',
-                '<input type="color" id="fbpro-field-icon-color" value="' + (btn.icon_color || '#ffffff') + '">',
-                '<input type="text" id="fbpro-field-icon-color-hex" class="fbpro-hex-input" value="' + (btn.icon_color || '#ffffff').toUpperCase() + '" maxlength="7">',
-              '</div>',
+              self.colorFieldHtml('fbpro-field-icon-color', 'fbpro-field-icon-color-hex', btn.icon_color || '#ffffff', btn.icon_color_fallback || '#ffffff', '#ffffff'),
             '</div>',
             '<div class="fbpro-field">',
               '<label>Tamaño del botón (px)</label>',
@@ -750,31 +742,19 @@
             '<div class="fbpro-grid-2">',
               '<div class="fbpro-field">',
                 '<label>Color de fondo</label>',
-                '<div class="fbpro-color-row">',
-                  '<input type="color" id="fbpro-field-bubble-bg-color" value="' + (b.bg_color || '#ffffff') + '">',
-                  '<input type="text" class="fbpro-hex-input" value="' + (b.bg_color || '#ffffff').toUpperCase() + '" maxlength="7">',
-                '</div>',
+                self.colorFieldHtml('fbpro-field-bubble-bg-color', 'fbpro-field-bubble-bg-color-hex', b.bg_color || '#ffffff', b.bg_color_fallback || '#ffffff', '#ffffff'),
               '</div>',
               '<div class="fbpro-field">',
                 '<label>Color del título</label>',
-                '<div class="fbpro-color-row">',
-                  '<input type="color" id="fbpro-field-bubble-title-color" value="' + (b.title_color || '#1a1a2e') + '">',
-                  '<input type="text" class="fbpro-hex-input" value="' + (b.title_color || '#1a1a2e').toUpperCase() + '" maxlength="7">',
-                '</div>',
+                self.colorFieldHtml('fbpro-field-bubble-title-color', 'fbpro-field-bubble-title-color-hex', b.title_color || '#1a1a2e', b.title_color_fallback || '#1a1a2e', '#1a1a2e'),
               '</div>',
               '<div class="fbpro-field">',
                 '<label>Color del texto</label>',
-                '<div class="fbpro-color-row">',
-                  '<input type="color" id="fbpro-field-bubble-text-color" value="' + (b.text_color || '#4b5563') + '">',
-                  '<input type="text" class="fbpro-hex-input" value="' + (b.text_color || '#4b5563').toUpperCase() + '" maxlength="7">',
-                '</div>',
+                self.colorFieldHtml('fbpro-field-bubble-text-color', 'fbpro-field-bubble-text-color-hex', b.text_color || '#4b5563', b.text_color_fallback || '#4b5563', '#4b5563'),
               '</div>',
               '<div class="fbpro-field">',
                 '<label>Color del borde</label>',
-                '<div class="fbpro-color-row">',
-                  '<input type="color" id="fbpro-field-bubble-border-color" value="' + (b.border_color || '#e5e7eb') + '">',
-                  '<input type="text" class="fbpro-hex-input" value="' + (b.border_color || '#e5e7eb').toUpperCase() + '" maxlength="7">',
-                '</div>',
+                self.colorFieldHtml('fbpro-field-bubble-border-color', 'fbpro-field-bubble-border-color-hex', b.border_color || '#e5e7eb', b.border_color_fallback || '#e5e7eb', '#e5e7eb'),
               '</div>',
               '<div class="fbpro-field">',
                 '<label>Grosor del borde (px)</label>',
@@ -891,15 +871,19 @@
         icon_image_id:  parseInt($('#fbpro-field-icon-image-id').val() || 0, 10),
         icon_size:      parseInt($('#fbpro-field-icon-size').val() || 46, 10),
         image_fit:      $('#fbpro-field-image-fit').val() || 'cover',
-        bg_type:        $('#fbpro-field-bg-gradient').prop('checked') ? 'gradient' : 'solid',
-        bg_color:       $('#fbpro-field-bg-color').val() || '#2A90A0',
-        gradient_from:  $('#fbpro-field-gradient-from').val() || '#2A90A0',
-        gradient_to:    $('#fbpro-field-gradient-to').val() || '#1a6e7e',
+        bg_type:                $('#fbpro-field-bg-gradient').prop('checked') ? 'gradient' : 'solid',
+        bg_color:               $('#fbpro-field-bg-color-hex').val().trim() || '#2A90A0',
+        bg_color_fallback:      $('#fbpro-field-bg-color-hex-fallback').val().trim() || '#2A90A0',
+        gradient_from:          $('#fbpro-field-gradient-from-hex').val().trim() || '#2A90A0',
+        gradient_from_fallback: $('#fbpro-field-gradient-from-hex-fallback').val().trim() || '#2A90A0',
+        gradient_to:            $('#fbpro-field-gradient-to-hex').val().trim() || '#1a6e7e',
+        gradient_to_fallback:   $('#fbpro-field-gradient-to-hex-fallback').val().trim() || '#1a6e7e',
         gradient_angle: (function () {
           var p = $('#fbpro-field-gradient-angle-preset').val();
           return p === 'custom' ? parseInt($('#fbpro-field-gradient-angle').val() || 135, 10) : parseInt(p || 135, 10);
         }()),
-        icon_color:     $('#fbpro-field-icon-color').val() || '#ffffff',
+        icon_color:             $('#fbpro-field-icon-color-hex').val().trim() || '#ffffff',
+        icon_color_fallback:    $('#fbpro-field-icon-color-hex-fallback').val().trim() || '#ffffff',
         size:           parseInt($('#fbpro-field-size').val() || 56, 10),
         radius:         parseInt($('#fbpro-field-radius').val() || 16, 10),
         shadow:         parseInt($('#fbpro-field-shadow').val() || 2, 10),
@@ -939,10 +923,14 @@
           position:         $('[name="bubble_position"]:checked').val() || 'left',
           show_arrow:       $('[name="bubble_show_arrow"]').prop('checked'),
           animation:        $('[name="bubble_animation"]').val() || 'fade',
-          bg_color:         $('#fbpro-field-bubble-bg-color').val() || '#ffffff',
-          title_color:      $('#fbpro-field-bubble-title-color').val() || '#1a1a2e',
-          text_color:       $('#fbpro-field-bubble-text-color').val() || '#4b5563',
-          border_color:     $('#fbpro-field-bubble-border-color').val() || '#e5e7eb',
+          bg_color:              $('#fbpro-field-bubble-bg-color-hex').val().trim() || '#ffffff',
+          bg_color_fallback:     $('#fbpro-field-bubble-bg-color-hex-fallback').val().trim() || '#ffffff',
+          title_color:           $('#fbpro-field-bubble-title-color-hex').val().trim() || '#1a1a2e',
+          title_color_fallback:  $('#fbpro-field-bubble-title-color-hex-fallback').val().trim() || '#1a1a2e',
+          text_color:            $('#fbpro-field-bubble-text-color-hex').val().trim() || '#4b5563',
+          text_color_fallback:   $('#fbpro-field-bubble-text-color-hex-fallback').val().trim() || '#4b5563',
+          border_color:          $('#fbpro-field-bubble-border-color-hex').val().trim() || '#e5e7eb',
+          border_color_fallback: $('#fbpro-field-bubble-border-color-hex-fallback').val().trim() || '#e5e7eb',
           border_width:     parseInt($('[name="bubble_border_width"]').val() || 1, 10),
           border_radius:    parseInt($('[name="bubble_border_radius"]').val() || 12, 10),
           title_size:       parseInt($('[name="bubble_title_size"]').val() || 15, 10),
@@ -1390,13 +1378,49 @@
       });
 
       /* ── Color picker ↔ hex input ─────────────────────────────── */
-      $(document).on('input', '.fbpro-color-row input[type="color"]', function () {
-        $(this).closest('.fbpro-color-row').find('.fbpro-hex-input').val($(this).val().toUpperCase());
+
+      // Picker principal cambia → actualiza hex (normal) o fallback hex (modo var)
+      $(document).on('input', '.fbpro-color-field > .fbpro-color-row input[type="color"]', function () {
+        var $field   = $(this).closest('.fbpro-color-field');
+        var $mainHex = $field.find('> .fbpro-color-row .fbpro-hex-input');
+        if (/^var\(/.test($mainHex.val().trim())) {
+          var hex = $(this).val().toUpperCase();
+          $field.find('.fbpro-fallback-row .fbpro-hex-input').val(hex);
+        } else {
+          $mainHex.val($(this).val().toUpperCase());
+        }
       });
-      $(document).on('input', '.fbpro-color-row .fbpro-hex-input', function () {
+
+      // Picker fallback cambia → actualiza fallback hex y también el picker principal
+      $(document).on('input', '.fbpro-fallback-row input[type="color"]', function () {
+        var hex = $(this).val().toUpperCase();
+        $(this).closest('.fbpro-fallback-row').find('.fbpro-hex-input').val(hex);
+        $(this).closest('.fbpro-color-field').find('> .fbpro-color-row input[type="color"]').val($(this).val());
+      });
+
+      // Hex principal cambia → sync picker y mostrar/ocultar fila fallback
+      $(document).on('input', '.fbpro-color-field > .fbpro-color-row .fbpro-hex-input', function () {
+        var $field       = $(this).closest('.fbpro-color-field');
+        var val          = $(this).val().trim();
+        var $fallbackRow = $field.find('.fbpro-fallback-row');
+        var $picker      = $field.find('> .fbpro-color-row input[type="color"]');
+        if (/^var\(/.test(val)) {
+          $fallbackRow.show();
+          var fbHex = $fallbackRow.find('.fbpro-hex-input').val().trim();
+          if (/^#[0-9a-fA-F]{6}$/.test(fbHex)) $picker.val(fbHex.toLowerCase());
+        } else {
+          $fallbackRow.hide();
+          if (/^#[0-9a-fA-F]{6}$/.test(val)) $picker.val(val.toLowerCase());
+        }
+      });
+
+      // Hex fallback cambia → sync picker fallback y picker principal
+      $(document).on('input', '.fbpro-fallback-row .fbpro-hex-input', function () {
         var val = $(this).val().trim();
         if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-          $(this).closest('.fbpro-color-row').find('input[type="color"]').val(val.toLowerCase());
+          var lc = val.toLowerCase();
+          $(this).closest('.fbpro-fallback-row').find('input[type="color"]').val(lc);
+          $(this).closest('.fbpro-color-field').find('> .fbpro-color-row input[type="color"]').val(lc);
         }
       });
     },
@@ -1431,6 +1455,33 @@
     escAttr: function (str) { return this.escHtml(str); },
     truncate: function (str, len) {
       return str.length > len ? str.slice(0, len) + '…' : str;
+    },
+
+    /* Genera el HTML de un campo de color completo (picker + hex + fila fallback) */
+    colorFieldHtml: function (pickerId, hexId, colorVal, fallbackVal, placeholder) {
+      colorVal    = (colorVal    || placeholder).trim();
+      fallbackVal = (fallbackVal || placeholder).trim();
+      placeholder = placeholder || '#000000';
+      var isVar     = /^var\(/.test(colorVal);
+      var pickerHex = isVar ? fallbackVal : colorVal;
+      // Ensure picker gets a 6-digit hex
+      if (!/^#[0-9a-fA-F]{6}$/.test(pickerHex)) pickerHex = placeholder;
+      var showFallback = isVar ? '' : ' style="display:none"';
+      return [
+        '<div class="fbpro-color-field">',
+          '<div class="fbpro-color-row">',
+            '<input type="color" id="' + pickerId + '" value="' + this.escAttr(pickerHex.toLowerCase()) + '">',
+            '<input type="text" id="' + hexId + '" class="fbpro-hex-input" value="' + this.escAttr(colorVal) + '" placeholder="' + this.escAttr(placeholder) + '">',
+          '</div>',
+          '<div class="fbpro-fallback-row"' + showFallback + '>',
+            '<label class="fbpro-fallback-label">Respaldo <small>si la variable no está disponible</small></label>',
+            '<div class="fbpro-color-row">',
+              '<input type="color" value="' + this.escAttr(fallbackVal.toLowerCase()) + '">',
+              '<input type="text" id="' + hexId + '-fallback" class="fbpro-hex-input" value="' + this.escAttr(fallbackVal.toUpperCase()) + '" placeholder="' + this.escAttr(placeholder) + '">',
+            '</div>',
+          '</div>',
+        '</div>',
+      ].join('');
     },
 
     /* Aproximación a sanitize_title() de PHP para el preview del trigger_slug en admin */

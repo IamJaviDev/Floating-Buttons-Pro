@@ -23,12 +23,16 @@ function fbpro_button_defaults() {
         'icon_size'      => 46,
         'image_fit'      => 'cover',
         // Estilo
-        'bg_type'        => 'solid',
-        'bg_color'       => '#2A90A0',
-        'gradient_from'  => '#2A90A0',
-        'gradient_to'    => '#1a6e7e',
-        'gradient_angle' => 135,
-        'icon_color'     => '#ffffff',
+        'bg_type'                => 'solid',
+        'bg_color'               => '#2A90A0',
+        'bg_color_fallback'      => '#2A90A0',
+        'gradient_from'          => '#2A90A0',
+        'gradient_from_fallback' => '#2A90A0',
+        'gradient_to'            => '#1a6e7e',
+        'gradient_to_fallback'   => '#1a6e7e',
+        'gradient_angle'         => 135,
+        'icon_color'             => '#ffffff',
+        'icon_color_fallback'    => '#ffffff',
         'size'           => 56,
         'radius'         => 16,
         'shadow'         => 2,
@@ -61,10 +65,14 @@ function fbpro_button_defaults() {
             'remember_close'   => true,
             'position'         => 'left',
             'show_arrow'       => true,
-            'bg_color'         => '#ffffff',
-            'title_color'      => '#1a1a2e',
-            'text_color'       => '#4b5563',
-            'border_color'     => '#e5e7eb',
+            'bg_color'              => '#ffffff',
+            'bg_color_fallback'     => '#ffffff',
+            'title_color'           => '#1a1a2e',
+            'title_color_fallback'  => '#1a1a2e',
+            'text_color'            => '#4b5563',
+            'text_color_fallback'   => '#4b5563',
+            'border_color'          => '#e5e7eb',
+            'border_color_fallback' => '#e5e7eb',
             'border_width'     => 1,
             'border_radius'    => 12,
             'title_size'       => 15,
@@ -156,6 +164,48 @@ function fbpro_bubble_shadow( $level ) {
         case '3': return '0 6px 24px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.14)';
         default:  return '0 4px 14px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.08)';
     }
+}
+
+function fbpro_is_css_var( $value ) {
+    return strncmp( trim( (string) $value ), 'var(', 4 ) === 0;
+}
+
+function fbpro_sanitize_color( $value, $default ) {
+    $value = trim( (string) $value );
+    if ( sanitize_hex_color( $value ) ) return $value;
+    if ( preg_match( '/^var\(--[a-zA-Z0-9_-]+(\s*,\s*[^)]+)?\s*\)$/', $value ) ) return $value;
+    return $default;
+}
+
+function fbpro_shadow_mix( $var_string, $level ) {
+    $c = "color-mix(in srgb, {$var_string} 40%, transparent)";
+    switch ( (string) $level ) {
+        case '0': return 'none';
+        case '1': return "0 2px 8px {$c}";
+        case '2': return "0 4px 14px {$c}, 0 1px 3px rgba(0,0,0,.12)";
+        case '3': return "0 6px 24px {$c}, 0 2px 8px rgba(0,0,0,.18)";
+        default:  return "0 4px 14px {$c}";
+    }
+}
+
+function fbpro_shadow_for_color( $color_value, $level ) {
+    if ( fbpro_is_css_var( $color_value ) ) {
+        return fbpro_shadow_mix( $color_value, $level );
+    }
+    return fbpro_shadow( $color_value, $level );
+}
+
+function fbpro_color_with_fallback( $color, $fallback ) {
+    if ( ! fbpro_is_css_var( $color ) ) {
+        return $color;
+    }
+    // Si el var() ya tiene fallback inline (var(--x, algo)), respetarlo
+    if ( preg_match( '/^var\(\s*--[a-zA-Z_][a-zA-Z0-9_-]*\s*,/', $color ) ) {
+        return $color;
+    }
+    // var(--x) sin fallback inline: embeber el _fallback
+    $var_name = trim( substr( $color, 4, -1 ) );
+    return 'var(' . $var_name . ', ' . $fallback . ')';
 }
 
 function fbpro_corner_css( $corner, $ox, $oy ) {
@@ -380,6 +430,17 @@ function fbpro_scope_popup_css( $raw_css, $popup_id ) {
 
 function fbpro_sanitize_bubble( $raw ) {
     if ( ! is_array( $raw ) ) $raw = [];
+
+    $bg_color    = fbpro_sanitize_color( $raw['bg_color']    ?? '#ffffff', '#ffffff' );
+    $title_color = fbpro_sanitize_color( $raw['title_color'] ?? '#1a1a2e', '#1a1a2e' );
+    $text_color  = fbpro_sanitize_color( $raw['text_color']  ?? '#4b5563', '#4b5563' );
+    $border_color= fbpro_sanitize_color( $raw['border_color']?? '#e5e7eb', '#e5e7eb' );
+
+    $bg_fallback     = sanitize_hex_color( $raw['bg_color_fallback']    ?? '' ) ?: ( fbpro_is_css_var( $bg_color )    ? '#ffffff' : $bg_color );
+    $title_fallback  = sanitize_hex_color( $raw['title_color_fallback'] ?? '' ) ?: ( fbpro_is_css_var( $title_color ) ? '#1a1a2e' : $title_color );
+    $text_fallback   = sanitize_hex_color( $raw['text_color_fallback']  ?? '' ) ?: ( fbpro_is_css_var( $text_color )  ? '#4b5563' : $text_color );
+    $border_fallback = sanitize_hex_color( $raw['border_color_fallback']?? '' ) ?: ( fbpro_is_css_var( $border_color )? '#e5e7eb' : $border_color );
+
     return [
         'enabled'          => ! empty( $raw['enabled'] ),
         'title'            => sanitize_text_field( $raw['title'] ?? '' ),
@@ -394,10 +455,14 @@ function fbpro_sanitize_bubble( $raw ) {
         'position'         => in_array( $raw['position'] ?? 'left', ['left','right','top','bottom'], true )
                               ? $raw['position'] : 'left',
         'show_arrow'       => ! empty( $raw['show_arrow'] ),
-        'bg_color'         => sanitize_hex_color( $raw['bg_color'] ?? '#ffffff' ) ?: '#ffffff',
-        'title_color'      => sanitize_hex_color( $raw['title_color'] ?? '#1a1a2e' ) ?: '#1a1a2e',
-        'text_color'       => sanitize_hex_color( $raw['text_color'] ?? '#4b5563' ) ?: '#4b5563',
-        'border_color'     => sanitize_hex_color( $raw['border_color'] ?? '#e5e7eb' ) ?: '#e5e7eb',
+        'bg_color'              => $bg_color,
+        'bg_color_fallback'     => $bg_fallback,
+        'title_color'           => $title_color,
+        'title_color_fallback'  => $title_fallback,
+        'text_color'            => $text_color,
+        'text_color_fallback'   => $text_fallback,
+        'border_color'          => $border_color,
+        'border_color_fallback' => $border_fallback,
         'border_width'     => max( 0, min( 10, absint( $raw['border_width'] ?? 1 ) ) ),
         'border_radius'    => max( 0, min( 50, absint( $raw['border_radius'] ?? 12 ) ) ),
         'title_size'       => max( 10, min( 32, absint( $raw['title_size'] ?? 15 ) ) ),
@@ -459,6 +524,16 @@ function fbpro_sanitize_button( $raw ) {
     $action_type = in_array( $raw['action_type'] ?? '', [ 'link', 'popup' ] ) ? $raw['action_type'] : 'link';
     $popup_mode  = in_array( $raw['popup_mode'] ?? '', [ 'shortcode', 'html' ] ) ? $raw['popup_mode'] : 'shortcode';
 
+    $bg_color      = fbpro_sanitize_color( $raw['bg_color']      ?? '#2A90A0', '#2A90A0' );
+    $gradient_from = fbpro_sanitize_color( $raw['gradient_from'] ?? '#2A90A0', '#2A90A0' );
+    $gradient_to   = fbpro_sanitize_color( $raw['gradient_to']   ?? '#1a6e7e', '#1a6e7e' );
+    $icon_color    = fbpro_sanitize_color( $raw['icon_color']    ?? '#ffffff',  '#ffffff'  );
+
+    $bg_color_fallback      = sanitize_hex_color( $raw['bg_color_fallback']      ?? '' ) ?: ( fbpro_is_css_var( $bg_color )      ? '#2A90A0' : $bg_color );
+    $gradient_from_fallback = sanitize_hex_color( $raw['gradient_from_fallback'] ?? '' ) ?: ( fbpro_is_css_var( $gradient_from )  ? '#2A90A0' : $gradient_from );
+    $gradient_to_fallback   = sanitize_hex_color( $raw['gradient_to_fallback']   ?? '' ) ?: ( fbpro_is_css_var( $gradient_to )    ? '#1a6e7e' : $gradient_to   );
+    $icon_color_fallback    = sanitize_hex_color( $raw['icon_color_fallback']    ?? '' ) ?: ( fbpro_is_css_var( $icon_color )     ? '#ffffff'  : $icon_color   );
+
     return [
         'id'             => sanitize_text_field( $raw['id'] ?? '' ),
         'active'         => ! empty( $raw['active'] ),
@@ -477,12 +552,16 @@ function fbpro_sanitize_button( $raw ) {
         'icon_size'      => max( 10, min( 90, absint( $raw['icon_size'] ?? 46 ) ) ),
         'image_fit'      => in_array( $raw['image_fit'] ?? '', [ 'cover', 'contain', 'fill' ] ) ? $raw['image_fit'] : 'cover',
 
-        'bg_type'        => in_array( $raw['bg_type'] ?? '', [ 'solid', 'gradient' ] ) ? $raw['bg_type'] : 'solid',
-        'bg_color'       => sanitize_hex_color( $raw['bg_color'] ?? '#2A90A0' ) ?: '#2A90A0',
-        'gradient_from'  => sanitize_hex_color( $raw['gradient_from'] ?? '#2A90A0' ) ?: '#2A90A0',
-        'gradient_to'    => sanitize_hex_color( $raw['gradient_to']   ?? '#1a6e7e' ) ?: '#1a6e7e',
-        'gradient_angle' => max( 0, min( 360, absint( $raw['gradient_angle'] ?? 135 ) ) ),
-        'icon_color'     => sanitize_hex_color( $raw['icon_color'] ?? '#ffffff' ) ?: '#ffffff',
+        'bg_type'                => in_array( $raw['bg_type'] ?? '', [ 'solid', 'gradient' ] ) ? $raw['bg_type'] : 'solid',
+        'bg_color'               => $bg_color,
+        'bg_color_fallback'      => $bg_color_fallback,
+        'gradient_from'          => $gradient_from,
+        'gradient_from_fallback' => $gradient_from_fallback,
+        'gradient_to'            => $gradient_to,
+        'gradient_to_fallback'   => $gradient_to_fallback,
+        'gradient_angle'         => max( 0, min( 360, absint( $raw['gradient_angle'] ?? 135 ) ) ),
+        'icon_color'             => $icon_color,
+        'icon_color_fallback'    => $icon_color_fallback,
         'size'           => max( 32, min( 120, absint( $raw['size'] ?? 56 ) ) ),
         'radius'         => min( 100, absint( $raw['radius'] ?? 16 ) ),
         'shadow'         => min( 3, absint( $raw['shadow'] ?? 2 ) ),
@@ -551,19 +630,31 @@ function fbpro_generate_css() {
         $size = absint( $btn['size'] ?? 56 ) ?: 56;
 
         if ( ( $btn['bg_type'] ?? 'solid' ) === 'gradient' ) {
-            $from         = sanitize_hex_color( $btn['gradient_from'] ?? '#2A90A0' ) ?: '#2A90A0';
-            $to           = sanitize_hex_color( $btn['gradient_to']   ?? '#1a6e7e' ) ?: '#1a6e7e';
-            $ang          = max( 0, min( 360, absint( $btn['gradient_angle'] ?? 135 ) ) );
-            $bg           = "linear-gradient({$ang}deg, {$from}, {$to})";
+            $from = fbpro_color_with_fallback(
+                fbpro_sanitize_color( $btn['gradient_from'] ?? '#2A90A0', '#2A90A0' ),
+                $btn['gradient_from_fallback'] ?? '#2A90A0'
+            );
+            $to   = fbpro_color_with_fallback(
+                fbpro_sanitize_color( $btn['gradient_to'] ?? '#1a6e7e', '#1a6e7e' ),
+                $btn['gradient_to_fallback'] ?? '#1a6e7e'
+            );
+            $ang  = max( 0, min( 360, absint( $btn['gradient_angle'] ?? 135 ) ) );
+            $bg   = "linear-gradient({$ang}deg, {$from}, {$to})";
             $shadow_color = $from;
         } else {
-            $bg           = sanitize_hex_color( $btn['bg_color'] ?? '#2A90A0' ) ?: '#2A90A0';
+            $bg = fbpro_color_with_fallback(
+                fbpro_sanitize_color( $btn['bg_color'] ?? '#2A90A0', '#2A90A0' ),
+                $btn['bg_color_fallback'] ?? '#2A90A0'
+            );
             $shadow_color = $bg;
         }
 
         $radius     = absint( $btn['radius'] ?? 16 );
-        $shadow     = fbpro_shadow( $shadow_color, $btn['shadow'] ?? 2 );
-        $icon_color = sanitize_hex_color( $btn['icon_color'] ?? '#ffffff' ) ?: '#ffffff';
+        $shadow     = fbpro_shadow_for_color( $shadow_color, $btn['shadow'] ?? 2 );
+        $icon_color = fbpro_color_with_fallback(
+            fbpro_sanitize_color( $btn['icon_color'] ?? '#ffffff', '#ffffff' ),
+            $btn['icon_color_fallback'] ?? '#ffffff'
+        );
         $icon_size  = absint( $btn['icon_size'] ?? 46 );
         $image_fit  = in_array( $btn['image_fit'] ?? '', [ 'cover', 'contain', 'fill' ] ) ? $btn['image_fit'] : 'cover';
 
@@ -633,10 +724,10 @@ function fbpro_generate_css() {
         $id = esc_attr( $btn['id'] );
         $b  = $btn['bubble'];
 
-        $bg           = sanitize_hex_color( $b['bg_color']     ?? '#ffffff' ) ?: '#ffffff';
-        $text_color   = sanitize_hex_color( $b['text_color']   ?? '#4b5563' ) ?: '#4b5563';
-        $border_color = sanitize_hex_color( $b['border_color'] ?? '#e5e7eb' ) ?: '#e5e7eb';
-        $title_color  = sanitize_hex_color( $b['title_color']  ?? '#1a1a2e' ) ?: '#1a1a2e';
+        $bg           = fbpro_color_with_fallback( fbpro_sanitize_color( $b['bg_color']     ?? '#ffffff', '#ffffff' ), $b['bg_color_fallback']     ?? '#ffffff' );
+        $text_color   = fbpro_color_with_fallback( fbpro_sanitize_color( $b['text_color']   ?? '#4b5563', '#4b5563' ), $b['text_color_fallback']   ?? '#4b5563' );
+        $border_color = fbpro_color_with_fallback( fbpro_sanitize_color( $b['border_color'] ?? '#e5e7eb', '#e5e7eb' ), $b['border_color_fallback'] ?? '#e5e7eb' );
+        $title_color  = fbpro_color_with_fallback( fbpro_sanitize_color( $b['title_color']  ?? '#1a1a2e', '#1a1a2e' ), $b['title_color_fallback']  ?? '#1a1a2e' );
         $bw           = absint( $b['border_width']  ?? 1 );
         $br           = absint( $b['border_radius'] ?? 12 );
         $padding      = absint( $b['padding']   ?? 14 );
