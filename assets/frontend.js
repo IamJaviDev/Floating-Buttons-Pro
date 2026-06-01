@@ -58,19 +58,19 @@
       });
     });
 
-    document.querySelectorAll('.fbpro-overlay').forEach(function (overlay) {
+    document.querySelectorAll('.fbpro-overlay, .fbpro-bar').forEach(function (overlay) {
       var closeBtn = overlay.querySelector('.fbpro-popup__close');
       if (closeBtn) {
         closeBtn.addEventListener('click', function () { closePopup(overlay); });
       }
       overlay.addEventListener('click', function (e) {
-        if (e.target === overlay) closePopup(overlay);
+        if (!overlay.classList.contains('fbpro-bar') && e.target === overlay) closePopup(overlay);
       });
     });
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
-        document.querySelectorAll('.fbpro-overlay.is-open').forEach(closePopup);
+        document.querySelectorAll('.fbpro-overlay.is-open, .fbpro-bar.is-open').forEach(closePopup);
       }
     });
 
@@ -85,7 +85,7 @@
         console.warn('[fbpro] Elemento .fbpro-open-popup sin atributo data-fbpro-target');
         return;
       }
-      var overlay = document.querySelector('.fbpro-overlay[data-fbpro-slug="' + slug + '"]');
+      var overlay = document.querySelector('.fbpro-overlay[data-fbpro-slug="' + slug + '"], .fbpro-bar[data-fbpro-slug="' + slug + '"]');
       if (!overlay) {
         console.warn('[fbpro] No se encontró ningún popup con slug "' + slug + '". ¿Está el botón activo y configurado para esta página?');
         return;
@@ -97,7 +97,7 @@
       var trigger = e.target.closest('.fbpro-close-popup');
       if (!trigger) return;
       e.preventDefault();
-      var openOverlay = document.querySelector('.fbpro-overlay.is-open');
+      var openOverlay = document.querySelector('.fbpro-overlay.is-open, .fbpro-bar.is-open');
       if (openOverlay) closePopup(openOverlay);
     });
 
@@ -242,7 +242,7 @@
     /* ── Triggers automáticos de popup ─────────────────────────── */
     (function () {
       var pending = document.querySelectorAll(
-        '.fbpro-overlay[data-trigger-on-time], .fbpro-overlay[data-trigger-on-scroll]'
+        '.fbpro-overlay[data-trigger-on-time], .fbpro-overlay[data-trigger-on-scroll], .fbpro-bar[data-trigger-on-time], .fbpro-bar[data-trigger-on-scroll]'
       );
       if (!pending.length) return;
 
@@ -319,22 +319,76 @@
       }
     }());
 
+    var _resizeRaf = false;
     window.addEventListener('resize', function () {
-      document.querySelectorAll('.fbpro-bubble.is-visible').forEach(adjustBubblePosition);
+      if (_resizeRaf) return;
+      _resizeRaf = true;
+      requestAnimationFrame(function () {
+        _resizeRaf = false;
+        document.querySelectorAll('.fbpro-bubble.is-visible').forEach(adjustBubblePosition);
+        var openBar = document.querySelector('.fbpro-bar.is-open');
+        if (openBar) pushWrapper(openBar);
+      });
     });
 
+    function pushWrapper(barEl) {
+      var wrapper = document.querySelector('.fbpro-wrapper');
+      if (!wrapper) return;
+      var isBarBottom   = barEl.classList.contains('fbpro-bar--bottom');
+      var isBarTop      = barEl.classList.contains('fbpro-bar--top');
+      var wrapperBottom = wrapper.classList.contains('fbpro-wrapper--bottom');
+      var wrapperTop    = wrapper.classList.contains('fbpro-wrapper--top');
+      if ((isBarBottom && wrapperBottom) || (isBarTop && wrapperTop)) {
+        var h   = barEl.offsetHeight;
+        var dir = isBarBottom ? -1 : 1;
+        wrapper.style.transform = 'translateY(' + (dir * (h + 12)) + 'px)';
+      }
+    }
+
+    function revertWrapper() {
+      var wrapper = document.querySelector('.fbpro-wrapper');
+      if (wrapper) wrapper.style.transform = '';
+    }
+
     function openPopup(overlay) {
-      overlay.setAttribute('aria-hidden', 'false');
+      var isBar = overlay.classList.contains('fbpro-bar');
+      overlay.removeAttribute('inert');
       overlay.classList.add('is-open');
-      document.body.style.overflow = 'hidden';
+      if (!isBar) {
+        document.body.style.overflow = 'hidden';
+      }
       var closeBtn = overlay.querySelector('.fbpro-popup__close');
       if (closeBtn) closeBtn.focus();
+      if (isBar) {
+        requestAnimationFrame(function () { pushWrapper(overlay); });
+      }
     }
 
     function closePopup(overlay) {
+      var isBar = overlay.classList.contains('fbpro-bar');
       overlay.classList.remove('is-open');
-      overlay.setAttribute('aria-hidden', 'true');
-      document.body.style.overflow = '';
+      overlay.setAttribute('inert', '');
+      if (!isBar) {
+        document.body.style.overflow = '';
+      } else {
+        revertWrapper();
+      }
+
+      // Trigger on_close: abrir hijos configurados para abrirse al cerrar este popup
+      var closedSlug = overlay.getAttribute('data-fbpro-slug');
+      if (!closedSlug) return;
+
+      document.querySelectorAll('[data-trigger-on-close="1"]').forEach(function (child) {
+        if (child.getAttribute('data-trigger-close-target') !== closedSlug) return;
+        var childId = child.id.replace('fbpro-overlay-', '');
+        var once    = child.getAttribute('data-trigger-once') === '1';
+        var key     = 'fbpro_popup_shown_' + childId;
+
+        if (once && sessionStorage.getItem(key)) return;
+        if (once) sessionStorage.setItem(key, '1');
+
+        setTimeout(function () { openPopup(child); }, 350);
+      });
     }
 
   });

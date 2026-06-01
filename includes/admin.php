@@ -336,6 +336,18 @@ function fbpro_ajax_save_button() {
         }
     }
 
+    // Validar que barra sin círculo flotante tiene al menos una vía de apertura
+    if ( $btn['action_type'] === 'popup'
+         && in_array( $btn['popup_display'], [ 'bar-bottom', 'bar-top' ], true )
+         && ! empty( $btn['hide_floating_button'] ) ) {
+        $trigger      = $btn['popup_trigger'];
+        $has_auto     = ! empty( $trigger['enabled'] ) && ( ! empty( $trigger['on_time'] ) || ! empty( $trigger['on_scroll'] ) || ! empty( $trigger['on_close'] ) );
+        $has_slug     = ! empty( $btn['trigger_slug'] );
+        if ( ! $has_auto && ! $has_slug ) {
+            wp_send_json_error( [ 'message' => 'Has ocultado el botón flotante de esta barra, pero no tiene ninguna forma de abrirse. Activa un trigger automático (tiempo, scroll o al cerrar otro popup) o asigna un identificador para abrirla desde un enlace externo.' ] );
+        }
+    }
+
     $buttons = fbpro_get_buttons();
 
     // ¿Nuevo o actualizar existente?

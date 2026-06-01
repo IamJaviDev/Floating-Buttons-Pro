@@ -39,11 +39,14 @@ function fbpro_button_defaults() {
         // Hover
         'hover_effect'   => 'scale',
         // Popup
-        'popup_mode'     => 'shortcode',
-        'popup_content'  => '',
-        'popup_css'      => '',
-        'popup_pages'    => '',
-        'trigger_slug'   => '',
+        'popup_mode'      => 'shortcode',
+        'popup_content'   => '',
+        'popup_css'       => '',
+        'popup_pages'     => '',
+        'trigger_slug'    => '',
+        'popup_display'        => 'modal',
+        'popup_show_close'     => true,
+        'hide_floating_button' => false,
         // Visibilidad
         'hide_mobile'    => false,
         'hide_desktop'   => false,
@@ -90,6 +93,8 @@ function fbpro_button_defaults() {
             'on_scroll'        => false,
             'scroll_percent'   => 50,
             'once_per_session' => true,
+            'on_close'         => false,
+            'close_target'     => '',
         ],
     ];
 }
@@ -485,6 +490,8 @@ function fbpro_sanitize_popup_trigger( $raw ) {
         'on_scroll'        => ! empty( $raw['on_scroll'] ),
         'scroll_percent'   => max( 5, min( 95, absint( $raw['scroll_percent'] ?? 50 ) ) ),
         'once_per_session' => isset( $raw['once_per_session'] ) ? ! empty( $raw['once_per_session'] ) : true,
+        'on_close'         => ! empty( $raw['on_close'] ),
+        'close_target'     => sanitize_title( $raw['close_target'] ?? '' ),
     ];
 }
 
@@ -521,8 +528,10 @@ function fbpro_sanitize_button( $raw ) {
     if ( ! is_array( $raw ) ) return [];
     $svgs = array_keys( fbpro_icon_library() );
 
-    $action_type = in_array( $raw['action_type'] ?? '', [ 'link', 'popup' ] ) ? $raw['action_type'] : 'link';
-    $popup_mode  = in_array( $raw['popup_mode'] ?? '', [ 'shortcode', 'html' ] ) ? $raw['popup_mode'] : 'shortcode';
+    $action_type  = in_array( $raw['action_type'] ?? '', [ 'link', 'popup' ] ) ? $raw['action_type'] : 'link';
+    $popup_mode   = in_array( $raw['popup_mode'] ?? '', [ 'shortcode', 'html' ] ) ? $raw['popup_mode'] : 'shortcode';
+    $popup_display = in_array( $raw['popup_display'] ?? '', [ 'modal', 'bar-bottom', 'bar-top' ], true )
+        ? $raw['popup_display'] : 'modal';
 
     $bg_color      = fbpro_sanitize_color( $raw['bg_color']      ?? '#2A90A0', '#2A90A0' );
     $gradient_from = fbpro_sanitize_color( $raw['gradient_from'] ?? '#2A90A0', '#2A90A0' );
@@ -568,10 +577,13 @@ function fbpro_sanitize_button( $raw ) {
 
         'hover_effect'   => in_array( $raw['hover_effect'] ?? '', [ 'scale', 'pulse', 'brightness', 'none' ] ) ? $raw['hover_effect'] : 'scale',
 
-        'popup_mode'     => $popup_mode,
-        'popup_content'  => $popup_mode === 'html' ? ( $raw['popup_content'] ?? '' ) : wp_kses_post( $raw['popup_content'] ?? '' ),
-        'popup_css'      => sanitize_textarea_field( $raw['popup_css'] ?? '' ),
-        'popup_pages'    => sanitize_textarea_field( $raw['popup_pages'] ?? '' ),
+        'popup_mode'      => $popup_mode,
+        'popup_content'   => $popup_mode === 'html' ? ( $raw['popup_content'] ?? '' ) : wp_kses_post( $raw['popup_content'] ?? '' ),
+        'popup_css'       => sanitize_textarea_field( $raw['popup_css'] ?? '' ),
+        'popup_pages'     => sanitize_textarea_field( $raw['popup_pages'] ?? '' ),
+        'popup_display'        => $popup_display,
+        'popup_show_close'     => isset( $raw['popup_show_close'] ) ? ! empty( $raw['popup_show_close'] ) : true,
+        'hide_floating_button' => ! empty( $raw['hide_floating_button'] ),
 
         'hide_mobile'    => ! empty( $raw['hide_mobile'] ),
         'hide_desktop'   => ! empty( $raw['hide_desktop'] ),

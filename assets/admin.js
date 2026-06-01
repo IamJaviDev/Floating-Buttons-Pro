@@ -585,6 +585,26 @@
           '</div>',
           '<div id="fbpro-popup-fields"' + (!isPopup ? ' style="display:none"' : '') + '>',
             '<div class="fbpro-field">',
+              '<label>Estilo de visualización</label>',
+              '<select id="fbpro-field-popup-display">',
+                '<option value="modal"'      + ((btn.popup_display || 'modal') === 'modal'      ? ' selected' : '') + '>Ventana centrada (modal)</option>',
+                '<option value="bar-bottom"' + ((btn.popup_display || 'modal') === 'bar-bottom' ? ' selected' : '') + '>Barra inferior</option>',
+                '<option value="bar-top"'    + ((btn.popup_display || 'modal') === 'bar-top'    ? ' selected' : '') + '>Barra superior</option>',
+              '</select>',
+            '</div>',
+            '<div class="fbpro-field" id="fbpro-field-hide-floating-button-wrap"' + (['bar-bottom', 'bar-top'].indexOf(btn.popup_display || 'modal') === -1 ? ' style="display:none"' : '') + '>',
+              '<label class="fbpro-toggle">',
+                '<input type="checkbox" id="fbpro-field-hide-floating-button"' + (btn.hide_floating_button ? ' checked' : '') + '>',
+                '<span>Ocultar el botón flotante <small>(la barra se abrirá solo por triggers o enlaces externos)</small></span>',
+              '</label>',
+            '</div>',
+            '<div class="fbpro-field">',
+              '<label class="fbpro-toggle">',
+                '<input type="checkbox" id="fbpro-field-popup-show-close"' + (btn.popup_show_close !== false ? ' checked' : '') + '>',
+                '<span>Mostrar botón de cerrar (✕)</span>',
+              '</label>',
+            '</div>',
+            '<div class="fbpro-field">',
               '<label>Modo del popup</label>',
               '<select id="fbpro-field-popup-mode">',
                 '<option value="shortcode"' + (btn.popup_mode !== 'html' ? ' selected' : '') + '>Shortcode (CF7 u otro)</option>',
@@ -643,6 +663,18 @@
                   '<div style="display:flex;align-items:center;gap:8px;padding-left:8px;margin-top:4px">',
                     '<input type="number" id="fbpro-field-pt-scroll-percent" min="5" max="95" value="' + (pt.scroll_percent !== undefined ? pt.scroll_percent : 50) + '" style="width:64px">',
                     '<span style="font-size:13px;color:#6b7280">% de la página scrolleada</span>',
+                  '</div>',
+                '</div>',
+              '</div>',
+              '<div class="fbpro-field">',
+                '<label class="fbpro-toggle" style="margin-bottom:6px">',
+                  '<input type="checkbox" id="fbpro-field-pt-on-close"' + (pt.on_close ? ' checked' : '') + '>',
+                  '<span>Abrir al cerrarse otro popup</span>',
+                '</label>',
+                '<div class="fbpro-pt-close-target"' + (!pt.on_close ? ' style="display:none"' : '') + '>',
+                  '<div style="padding-left:8px;margin-top:4px">',
+                    '<input type="text" id="fbpro-field-pt-close-target" value="' + self.escAttr(pt.close_target || '') + '" placeholder="mi-popup-padre" style="width:100%;margin-bottom:4px">',
+                    '<p class="fbpro-help" style="margin:0">Escribe el identificador (slug) del popup cuyo cierre activará la apertura de este. Lo encuentras en el campo <em>Identificador para enlaces externos</em> del popup padre.</p>',
                   '</div>',
                 '</div>',
               '</div>',
@@ -889,10 +921,13 @@
         shadow:         parseInt($('#fbpro-field-shadow').val() || 2, 10),
         hover_effect:   $('input[name="fbpro_hover"]:checked').val() || 'scale',
         trigger_slug:   $('#fbpro-field-trigger-slug').val() || '',
-        popup_mode:     $('#fbpro-field-popup-mode').val() || 'shortcode',
-        popup_content:  $('#fbpro-field-popup-content').val(),
-        popup_css:      this.cmEditor ? this.cmEditor.codemirror.getValue() : ($('#fbpro-field-popup-css').val() || ''),
-        popup_pages:    $('#fbpro-field-popup-pages').val(),
+        popup_mode:       $('#fbpro-field-popup-mode').val() || 'shortcode',
+        popup_content:    $('#fbpro-field-popup-content').val(),
+        popup_css:        this.cmEditor ? this.cmEditor.codemirror.getValue() : ($('#fbpro-field-popup-css').val() || ''),
+        popup_pages:      $('#fbpro-field-popup-pages').val(),
+        popup_display:         $('#fbpro-field-popup-display').val() || 'modal',
+        popup_show_close:      $('#fbpro-field-popup-show-close').prop('checked'),
+        hide_floating_button:  $('#fbpro-field-hide-floating-button').prop('checked'),
         hide_mobile:    $('#fbpro-field-hide-mobile').prop('checked'),
         hide_desktop:   $('#fbpro-field-hide-desktop').prop('checked'),
         hide_on:        ($('input[name="fbpro_action_type"]:checked').val() === 'popup')
@@ -946,6 +981,8 @@
           on_scroll:        $('[name="pt_on_scroll"]').prop('checked'),
           scroll_percent:   parseInt($('#fbpro-field-pt-scroll-percent').val() || 50, 10),
           once_per_session: $('#fbpro-field-pt-once').prop('checked'),
+          on_close:         $('#fbpro-field-pt-on-close').prop('checked'),
+          close_target:     $('#fbpro-field-pt-close-target').val() || '',
         },
       };
     },
@@ -1028,6 +1065,18 @@
 
         var data     = self.collectModalData();
         var sentSlug = data.trigger_slug || '';
+
+        // Validación frontend: barra sin círculo debe tener al menos una vía de apertura
+        var dataIsBar = data.popup_display === 'bar-bottom' || data.popup_display === 'bar-top';
+        if (dataIsBar && data.hide_floating_button) {
+          var hasTrigger = data.popup_trigger.enabled && (data.popup_trigger.on_time || data.popup_trigger.on_scroll || data.popup_trigger.on_close);
+          var hasSlug    = !!data.trigger_slug;
+          if (!hasTrigger && !hasSlug) {
+            $('#fbpro-modal-status').text('Error: Has ocultado el botón flotante de esta barra, pero no tiene ninguna forma de abrirse. Activa un trigger automático (tiempo, scroll o al cerrar otro popup) o asigna un identificador para abrirla desde un enlace externo.').addClass('fbpro-status--err');
+            $btn.prop('disabled', false).text('Guardar botón');
+            return;
+          }
+        }
 
         $.post(fbproData.ajaxUrl, {
           action: 'fbpro_save_button',
@@ -1346,6 +1395,15 @@
         $('#fbpro-gradient-angle-custom').toggle($(this).val() === 'custom');
       });
 
+      /* ── Modal: cambio estilo de visualización (popup-display) ── */
+      $(document).on('change', '#fbpro-field-popup-display', function () {
+        var isBar = $(this).val() === 'bar-bottom' || $(this).val() === 'bar-top';
+        $('#fbpro-field-hide-floating-button-wrap').toggle(isBar);
+        if (!isBar) {
+          $('#fbpro-field-hide-floating-button').prop('checked', false);
+        }
+      });
+
       /* ── Modal: cambio modo popup ────────────────────────────── */
       $(document).on('change', '#fbpro-field-popup-mode', function () {
         $('#fbpro-popup-script-hint').toggle($(this).val() === 'html');
@@ -1375,6 +1433,11 @@
 
       $(document).on('change', '[name="pt_on_scroll"]', function () {
         $(this).closest('.fbpro-field').find('.fbpro-pt-scroll-percent').toggle(this.checked);
+      });
+
+      /* ── Modal: trigger popup on_close sub-toggle ────────────── */
+      $(document).on('change', '#fbpro-field-pt-on-close', function () {
+        $(this).closest('.fbpro-field').find('.fbpro-pt-close-target').toggle(this.checked);
       });
 
       /* ── Color picker ↔ hex input ─────────────────────────────── */
